@@ -30,7 +30,10 @@ async function removePreviousAgents() {
     }
     if (program.stdout.trim() !== binary) continue;
     const label = await exec(["plutil", "-extract", "Label", "raw", "-o", "-", previous]);
-    if (label.code !== 0) throw new Error(`Cannot read previous Quota Pill agent label: ${entry}`);
+    if (label.code !== 0 || !label.stdout.trim()) {
+      console.warn("Skipping an unreadable previous LaunchAgent; it has been left unchanged.");
+      continue;
+    }
     const stopped = await launchctl("bootout", `${domain}/${label.stdout.trim()}`);
     if (stopped.code !== 0 && stopped.code !== 3) {
       throw new Error(stopped.stderr.trim() || `launchctl bootout exited with code ${stopped.code}`);

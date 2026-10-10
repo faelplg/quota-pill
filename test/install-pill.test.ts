@@ -29,12 +29,15 @@ macTest("installer migrates only previous agents targeting the same checkout", a
     const previous = join(agents, `${previousLabel}.plist`);
     const unrelated = join(agents, "dev.unrelated.quota-pill.plist");
     const malformed = join(agents, "dev.uninspectable.quota-pill.plist");
+    const unlabeled = join(agents, "dev.unlabeled.quota-pill.plist");
     const xml = (label: string, program: string) =>
       `<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Label</key><string>${label}</string><key>ProgramArguments</key><array><string>${program.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</string></array></dict></plist>`;
     await writeFile(previous, xml(previousLabel, binary));
     const unrelatedContent = xml("dev.unrelated.quota-pill", "/unrelated/QuotaPill");
     await writeFile(unrelated, unrelatedContent);
     await writeFile(malformed, "invalid plist");
+    const unlabeledContent = xml("", binary).replace("<key>Label</key><string></string>", "");
+    await writeFile(unlabeled, unlabeledContent);
     const log = join(directory, "launchctl.log");
     const bun = process.execPath;
     const run = async (...args: string[]) => {
@@ -50,7 +53,7 @@ macTest("installer migrates only previous agents targeting the same checkout", a
       ]);
       expect({ code, stderr }).toEqual({
         code: 0,
-        stderr: "Skipping an unreadable previous LaunchAgent; it has been left unchanged.\n",
+        stderr: "Skipping an unreadable previous LaunchAgent; it has been left unchanged.\n".repeat(2),
       });
       return stdout;
     };
@@ -58,6 +61,7 @@ macTest("installer migrates only previous agents targeting the same checkout", a
     expect(await Bun.file(previous).exists()).toBe(false);
     expect(await readFile(unrelated, "utf8")).toBe(unrelatedContent);
     expect(await readFile(malformed, "utf8")).toBe("invalid plist");
+    expect(await readFile(unlabeled, "utf8")).toBe(unlabeledContent);
     const current = join(agents, "org.quota-pill.agent.plist");
     expect(await readFile(current, "utf8")).toContain("<string>org.quota-pill.agent</string>");
     expect(await readFile(log, "utf8")).toContain(`/${previousLabel}`);
@@ -68,6 +72,7 @@ macTest("installer migrates only previous agents targeting the same checkout", a
     expect(await Bun.file(current).exists()).toBe(false);
     expect(await readFile(unrelated, "utf8")).toBe(unrelatedContent);
     expect(await readFile(malformed, "utf8")).toBe("invalid plist");
+    expect(await readFile(unlabeled, "utf8")).toBe(unlabeledContent);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
