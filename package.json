@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "install-plugin": "bun scripts/install-plugin.ts",
     "pill": "swift build -c release --package-path app && app/.build/release/QuotaPill",
-    "build:pill": "swift build -c release --package-path app"
+    "build:pill": "swift build -c release --package-path app",
+    "install-pill": "bun scripts/install-pill.ts",
+    "uninstall-pill": "bun scripts/install-pill.ts --uninstall"
   },
   "devDependencies": {
     "@types/bun": "latest",
