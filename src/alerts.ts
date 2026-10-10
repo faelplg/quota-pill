@@ -1,6 +1,4 @@
-import { mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { cachePath, readJson, writeJson } from "./cache.ts";
 import { exec } from "./exec.ts";
 import type { HarnessReport } from "./types.ts";
 
@@ -48,21 +46,15 @@ export function evaluateAlerts(reports: HarnessReport[], previous: AlertState) {
 }
 
 export function stateFile(): string {
-  const base = process.env.XDG_CACHE_HOME || join(homedir(), "Library", "Caches");
-  return join(base, "ai-quota", "alerts.json");
+  return cachePath("alerts.json");
 }
 
 export async function loadState(path = stateFile()): Promise<AlertState> {
-  try {
-    return await Bun.file(path).json();
-  } catch {
-    return {};
-  }
+  return (await readJson<AlertState>(path)) ?? {};
 }
 
 export async function saveState(state: AlertState, path = stateFile()): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  await Bun.write(path, JSON.stringify(state, null, 2));
+  await writeJson(path, state);
 }
 
 export async function notify(alert: Alert): Promise<void> {
