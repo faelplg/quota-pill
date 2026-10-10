@@ -24,7 +24,10 @@ async function removePreviousAgents() {
     if (!entry.endsWith(".quota-pill.plist")) continue;
     const previous = join(directory, entry);
     const program = await exec(["plutil", "-extract", "ProgramArguments.0", "raw", "-o", "-", previous]);
-    if (program.code !== 0) throw new Error(`Cannot inspect previous Quota Pill agent: ${entry}`);
+    if (program.code !== 0) {
+      console.warn("Skipping an unreadable previous LaunchAgent; it has been left unchanged.");
+      continue;
+    }
     if (program.stdout.trim() !== binary) continue;
     const label = await exec(["plutil", "-extract", "Label", "raw", "-o", "-", previous]);
     if (label.code !== 0) throw new Error(`Cannot read previous Quota Pill agent label: ${entry}`);
