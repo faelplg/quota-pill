@@ -41,14 +41,20 @@ enum Collector {
         return url
     }()
 
-    static func collect() async throws -> [HarnessReport] {
+    /// - Parameters:
+    ///   - only: Restricts the run to one harness.
+    ///   - force: Skips local caches, for refreshes the user asked for.
+    static func collect(only harness: String? = nil, force: Bool = false) async throws -> [HarnessReport] {
         guard let bun = searchPath
             .map({ URL(fileURLWithPath: $0).appendingPathComponent("bun") })
             .first(where: { FileManager.default.isExecutableFile(atPath: $0.path) })
         else { throw CollectorError.bunNotFound }
 
         let cli = projectRoot.appendingPathComponent("src/cli.ts").path
-        let data = try await run(bun, arguments: [cli])
+        var arguments = [cli]
+        if let harness { arguments += ["--only", harness] }
+        if force { arguments.append("--force") }
+        let data = try await run(bun, arguments: arguments)
         return try decoder.decode([HarnessReport].self, from: data)
     }
 

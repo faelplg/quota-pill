@@ -8,7 +8,7 @@ CP 47  CX 6  CC 69  AG 0
 
 Cada número é a janela mais cheia daquele harness, em %. `–` quer dizer que a fonte não está disponível agora, e `!` quer dizer que deu erro. Os números ficam azuis, passam a laranja a partir de 80% e a vermelho a partir de 95%. Ao cruzar esses limites, o macOS mostra uma notificação, uma vez por limite em cada ciclo de reset.
 
-A pílula fica visível inclusive sobre apps em tela cheia. Ao passar o mouse, ela expande com o detalhe de cada janela. Dá para arrastá-la, e a posição fica salva. O clique direito oferece "Atualizar agora" e "Sair".
+A pílula fica visível inclusive sobre apps em tela cheia. Ao passar o mouse, ela expande com o detalhe de cada janela. Dá para arrastá-la, e a posição fica salva. O ↻ no rodapé atualiza tudo, e o ↻ que aparece ao passar o mouse numa seção atualiza só aquele harness, ignorando o cache. O clique direito oferece "Atualizar agora" e "Sair".
 
 ## Instalação
 
@@ -36,7 +36,7 @@ Todas são lidas sem guardar credenciais. Nenhuma delas é uma API pública, ent
 ## Desenvolvimento
 
 ```sh
-bun start           # relatório em JSON, sem alertas
+bun start           # relatório em JSON, sem alertas (aceita --only <harness> e --force)
 bun run pill        # roda a pílula uma vez, em primeiro plano
 bun test
 bun run typecheck

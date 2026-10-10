@@ -122,6 +122,12 @@ describe("alerts", () => {
     expect(nextCycle.alerts).toHaveLength(1);
   });
 
+  test("keeps state for sources left out of a partial refresh", () => {
+    const { next } = evaluateAlerts([report(90)], {});
+    const partial = evaluateAlerts([{ ...report(10), harness: "codex" }], next);
+    expect(evaluateAlerts([report(90)], partial.next).alerts).toEqual([]);
+  });
+
   test("keeps state while a source is unreachable", () => {
     const { next } = evaluateAlerts([report(90)], {});
     const offline = evaluateAlerts([{ ...report(0), status: "error", windows: [] }], next);

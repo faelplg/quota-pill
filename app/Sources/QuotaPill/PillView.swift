@@ -60,7 +60,7 @@ private extension PillView {
         .onHover(perform: onHover)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : .snappy(duration: 0.22), value: state.expanded)
         .contextMenu {
-            Button("Atualizar agora") { store.refresh() }
+            Button("Atualizar agora") { store.refresh(force: true) }
             Divider()
             Button("Sair") { NSApp.terminate(nil) }
         }
@@ -104,7 +104,13 @@ private extension PillView {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ForEach(store.reports) { SectionView(report: $0) }
+            ForEach(store.reports) { report in
+                SectionView(
+                    report: report,
+                    isRefreshing: store.isRefreshing(report.harness),
+                    onRefresh: { store.refresh(harness: report.harness) }
+                )
+            }
             footer
         }
         .padding(.horizontal, 12)
@@ -114,15 +120,21 @@ private extension PillView {
     }
 
     private var footer: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if let failure = store.failure {
-                Text(failure)
-                    .foregroundStyle(Palette.critical)
-                    .fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .bottom, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                if let failure = store.failure {
+                    Text(failure)
+                        .foregroundStyle(Palette.critical)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let updated = store.lastUpdated {
+                    Text("Atualizado às \(Format.clock(updated))")
+                        .foregroundStyle(.secondary)
+                }
             }
-            if let updated = store.lastUpdated {
-                Text("Atualizado às \(Format.clock(updated))")
-                    .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            RefreshButton(label: "Atualizar tudo", isActive: store.isLoading) {
+                store.refresh(force: true)
             }
         }
         .font(.system(size: 11))
@@ -131,6 +143,10 @@ private extension PillView {
 
 private struct SectionView: View {
     let report: HarnessReport
+    let isRefreshing: Bool
+    let onRefresh: () -> Void
+
+    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -143,6 +159,11 @@ private struct SectionView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
+                Spacer(minLength: 0)
+                // Revealed on hover so four idle buttons don't clutter the panel.
+                RefreshButton(label: "Atualizar \(report.name)", isActive: isRefreshing, action: onRefresh)
+                    .opacity(isHovered || isRefreshing ? 1 : 0)
+                    .animation(.easeOut(duration: 0.15), value: isHovered)
             }
 
             if report.status == .ok {
@@ -162,6 +183,7 @@ private struct SectionView: View {
         }
         .contentShape(.rect)
         .onTapGesture(perform: open)
+        .onHover { isHovered = $0 }
     }
 
     private var caveat: String? {
@@ -183,6 +205,34 @@ private struct SectionView: View {
                   let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.antigravity") {
             NSWorkspace.shared.openApplication(at: app, configuration: .init())
         }
+    }
+}
+
+private struct RefreshButton: View {
+    let label: String
+    let isActive: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 10, weight: .semibold))
+                .symbolEffect(.rotate, options: .repeat(.continuous), isActive: isActive)
+                .frame(width: 16, height: 14)
+                .contentShape(.rect.inset(by: -4))
+        }
+        .buttonStyle(PressableStyle())
+        .foregroundStyle(.secondary)
+        .help(label)
+        .accessibilityLabel(label)
+    }
+}
+
+private struct PressableStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.85 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
