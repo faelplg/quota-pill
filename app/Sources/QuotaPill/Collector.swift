@@ -32,7 +32,7 @@ enum Collector {
     }()
 
     static let projectRoot: URL = {
-        if let root = ProcessInfo.processInfo.environment["AI_QUOTA_ROOT"] {
+        if let root = ProcessInfo.processInfo.environment["QUOTA_PILL_ROOT"] {
             return URL(fileURLWithPath: root)
         }
         // app/Sources/QuotaPill/Collector.swift -> project root

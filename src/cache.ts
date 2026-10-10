@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 export function cachePath(name: string): string {
   const base = process.env.XDG_CACHE_HOME || join(homedir(), "Library", "Caches");
-  return join(base, "ai-quota", name);
+  return join(base, "quota-pill", name);
 }
 
 export async function readJson<T>(path: string): Promise<T | undefined> {
