@@ -1,27 +1,30 @@
 # AI quota
 
-Mostra na barra de menu do macOS quanto você já usou das quotas do GitHub Copilot, Codex, Claude Code e Antigravity.
+Uma pílula flutuante no macOS que mostra quanto você já usou das quotas do GitHub Copilot, Codex, Claude Code e Antigravity.
 
 ```
 CP 47  CX 6  CC 69  AG 0
 ```
 
-Cada número é a janela mais cheia daquele harness, em %. `–` quer dizer que a fonte não está disponível agora, e `!` quer dizer que deu erro. O título fica azul, passa a laranja a partir de 80% e a vermelho a partir de 95%. Ao cruzar esses limites, o macOS mostra uma notificação, uma vez por limite em cada ciclo de reset.
+Cada número é a janela mais cheia daquele harness, em %. `–` quer dizer que a fonte não está disponível agora, e `!` quer dizer que deu erro. Os números ficam azuis, passam a laranja a partir de 80% e a vermelho a partir de 95%. Ao cruzar esses limites, o macOS mostra uma notificação, uma vez por limite em cada ciclo de reset.
+
+A pílula fica visível inclusive sobre apps em tela cheia. Ao passar o mouse, ela expande com o detalhe de cada janela. Dá para arrastá-la, e a posição fica salva. O clique direito oferece "Atualizar agora" e "Sair".
 
 ## Instalação
 
-Requer [Bun](https://bun.sh) e [SwiftBar](https://swiftbar.app).
+Requer [Bun](https://bun.sh), macOS 26 e Xcode ou Command Line Tools.
 
 ```sh
 bun install
-bun run install-plugin
+bun run install-pill    # compila e inicia no login (LaunchAgent)
+bun run uninstall-pill
 ```
 
-O instalador faz um symlink de `plugin/ai-quota.2m.sh` na pasta de plugins do SwiftBar e define essa pasta se ela ainda não existir. O plugin atualiza a cada 2 minutos.
+O LaunchAgent (`~/Library/LaunchAgents/org.quota-pill.agent.plist`) reinicia a pílula se ela travar, mas respeita o "Sair". Depois de mudar o código Swift, rode `bun run install-pill` de novo para recompilar e reiniciar.
 
 ## Fontes
 
-Todas são lidas sem guardar credenciais. Nenhuma delas é uma API pública, então qualquer uma pode mudar sem aviso. Cada adapter falha de forma isolada e mostra no menu o que aconteceu.
+Todas são lidas sem guardar credenciais. Nenhuma delas é uma API pública, então qualquer uma pode mudar sem aviso. Cada adapter falha de forma isolada e mostra na pílula o que aconteceu.
 
 | Harness | De onde vem | Observações |
 | --- | --- | --- |
@@ -33,24 +36,12 @@ Todas são lidas sem guardar credenciais. Nenhuma delas é uma API pública, ent
 ## Desenvolvimento
 
 ```sh
-bun run json        # relatório normalizado, sem alertas
-bun start           # saída do plugin
+bun start           # relatório em JSON, sem alertas
+bun run pill        # roda a pílula uma vez, em primeiro plano
 bun test
 bun run typecheck
 ```
 
-`src/adapters/` tem um arquivo por harness, e todos devolvem o mesmo formato (`HarnessReport` em `src/types.ts`). `src/render.ts` gera a saída do SwiftBar, e `src/alerts.ts` guarda em `~/Library/Caches/ai-quota/alerts.json` o que já foi notificado.
+`src/adapters/` tem um arquivo por harness, e todos devolvem o mesmo formato (`HarnessReport` em `src/types.ts`). `src/cli.ts` junta tudo em JSON e dispara os alertas, e `src/alerts.ts` guarda em `~/Library/Caches/ai-quota/alerts.json` o que já foi notificado.
 
-## Janela flutuante
-
-Uma pílula sempre visível com os mesmos indicadores, inclusive sobre apps em tela cheia. Ao passar o mouse, ela expande com o detalhe de cada janela. Dá para arrastá-la, e a posição fica salva. O clique direito oferece "Atualizar agora" e "Sair".
-
-```sh
-bun run pill            # roda uma vez, em primeiro plano
-bun run install-pill    # compila e inicia no login (LaunchAgent)
-bun run uninstall-pill
-```
-
-O LaunchAgent (`~/Library/LaunchAgents/org.quota-pill.agent.plist`) reinicia a pílula se ela travar, mas respeita o "Sair". Depois de mudar o código, rode `bun run install-pill` de novo para recompilar e reiniciar.
-
-É um app SwiftUI em `app/` (requer macOS 26 e Xcode ou Command Line Tools). Ele roda `bun src/cli.ts json --no-alerts` a cada 2 minutos e ao acordar o Mac, então os alertas continuam vindo só do plugin. Se o app não estiver dentro do checkout, aponte `AI_QUOTA_ROOT` para a raiz do projeto.
+A pílula é um app SwiftUI em `app/`. Ela roda `bun src/cli.ts` a cada 2 minutos e ao acordar o Mac. Se o app não estiver dentro do checkout, aponte `AI_QUOTA_ROOT` para a raiz do projeto.
