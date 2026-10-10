@@ -46,7 +46,11 @@ bun run typecheck
 Uma pílula sempre visível com os mesmos indicadores, inclusive sobre apps em tela cheia. Ao passar o mouse, ela expande com o detalhe de cada janela. Dá para arrastá-la, e a posição fica salva. O clique direito oferece "Atualizar agora" e "Sair".
 
 ```sh
-bun run pill
+bun run pill            # roda uma vez, em primeiro plano
+bun run install-pill    # compila e inicia no login (LaunchAgent)
+bun run uninstall-pill
 ```
+
+O LaunchAgent (`~/Library/LaunchAgents/dev.faelplg.quota-pill.plist`) reinicia a pílula se ela travar, mas respeita o "Sair". Depois de mudar o código, rode `bun run install-pill` de novo para recompilar e reiniciar.
 
 É um app SwiftUI em `app/` (requer macOS 26 e Xcode ou Command Line Tools). Ele roda `bun src/cli.ts json --no-alerts` a cada 2 minutos e ao acordar o Mac, então os alertas continuam vindo só do plugin. Se o app não estiver dentro do checkout, aponte `AI_QUOTA_ROOT` para a raiz do projeto.
