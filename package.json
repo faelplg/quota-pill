@@ -7,7 +7,9 @@
     "json": "bun src/cli.ts json --no-alerts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "install-plugin": "bun scripts/install-plugin.ts"
+    "install-plugin": "bun scripts/install-plugin.ts",
+    "pill": "swift build -c release --package-path app && app/.build/release/QuotaPill",
+    "build:pill": "swift build -c release --package-path app"
   },
   "devDependencies": {
     "@types/bun": "latest",
