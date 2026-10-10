@@ -1,0 +1,16 @@
+{
+  "name": "ai-quota",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun src/cli.ts",
+    "json": "bun src/cli.ts json --no-alerts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "install-plugin": "bun scripts/install-plugin.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^7"
+  }
+}
