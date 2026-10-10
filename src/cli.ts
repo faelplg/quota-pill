@@ -5,14 +5,14 @@ import type { HarnessId } from "./types.ts";
 
 const HARNESSES = adapters.map((a) => a.harness);
 
-const USAGE = `Uso: bun src/cli.ts [--only <harness>] [--force] [--no-alerts]
+const USAGE = `Usage: bun src/cli.ts [--only <harness>] [--force] [--no-alerts]
 
-  Imprime o relatório normalizado das fontes, em JSON, e notifica quando
-  uma quota cruza 80% ou 95%.
+  Prints normalized source reports as JSON and notifies when a quota crosses
+  80% or 95%.
 
-  --only <harness>  Consulta só esse harness (${HARNESSES.join(", ")}); pode repetir
-  --force           Ignora caches locais e consulta a fonte agora
-  --no-alerts       Não envia notificações nem altera o estado dos alertas`;
+  --only <harness>  Queries only this harness (${HARNESSES.join(", ")}); can be repeated
+  --force           Skips local caches and queries the source now
+  --no-alerts       Sends no notifications and does not change alert state`;
 
 async function main(argv: string[]): Promise<number> {
   let values;

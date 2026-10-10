@@ -6,7 +6,7 @@ enum CollectorError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .bunNotFound: "bun não encontrado. Instale com: brew install bun"
+        case .bunNotFound: "bun not found. Install it with: brew install bun"
         case .failed(let message): message
         }
     }
@@ -31,15 +31,22 @@ enum Collector {
         ]
     }()
 
-    static let projectRoot: URL = {
+    static func projectRoot() throws -> URL {
         if let root = ProcessInfo.processInfo.environment["QUOTA_PILL_ROOT"] {
             return URL(fileURLWithPath: root)
         }
-        // app/Sources/QuotaPill/Collector.swift -> project root
-        var url = URL(fileURLWithPath: #filePath)
-        for _ in 0..<4 { url.deleteLastPathComponent() }
-        return url
-    }()
+        guard var url = Bundle.main.executableURL?.resolvingSymlinksInPath() else {
+            throw CollectorError.failed("Cannot locate the collector. Set QUOTA_PILL_ROOT to the project root.")
+        }
+        url.deleteLastPathComponent()
+        while url.path != "/" {
+            if FileManager.default.fileExists(atPath: url.appendingPathComponent("src/cli.ts").path) {
+                return url
+            }
+            url.deleteLastPathComponent()
+        }
+        throw CollectorError.failed("Cannot locate the collector. Set QUOTA_PILL_ROOT to the project root.")
+    }
 
     /// - Parameters:
     ///   - only: Restricts the run to one harness.
@@ -50,7 +57,10 @@ enum Collector {
             .first(where: { FileManager.default.isExecutableFile(atPath: $0.path) })
         else { throw CollectorError.bunNotFound }
 
-        let cli = projectRoot.appendingPathComponent("src/cli.ts").path
+        let cli = try projectRoot().appendingPathComponent("src/cli.ts").path
+        guard FileManager.default.fileExists(atPath: cli) else {
+            throw CollectorError.failed("Cannot locate the collector. Set QUOTA_PILL_ROOT to the project root.")
+        }
         var arguments = [cli]
         if let harness { arguments += ["--only", harness] }
         if force { arguments.append("--force") }
@@ -97,7 +107,7 @@ enum Collector {
                 } else {
                     let message = String(decoding: errors, as: UTF8.self)
                         .split(separator: "\n").first.map(String.init)
-                        ?? "O coletor saiu com código \(process.terminationStatus)."
+                        ?? "The collector exited with code \(process.terminationStatus)."
                     continuation.resume(throwing: CollectorError.failed(message))
                 }
             }

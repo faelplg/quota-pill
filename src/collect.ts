@@ -12,7 +12,7 @@ async function run(adapter: Adapter, now: Date, options: CollectOptions): Promis
   const base = { harness: adapter.harness, name: adapter.name, short: adapter.short };
   try {
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Tempo esgotado ao consultar.")), TIMEOUT_MS).unref(),
+      setTimeout(() => reject(new Error("Query timed out.")), TIMEOUT_MS).unref(),
     );
     return { ...base, ...(await Promise.race([adapter.collect(now, options), timeout])) };
   } catch (err) {

@@ -21,12 +21,12 @@ type Usage = Record<string, unknown> & {
 
 const WINDOWS: [key: string, label: string][] = [
   ["five_hour", "5h"],
-  ["seven_day", "Semana"],
-  ["seven_day_opus", "Semana · Opus"],
-  ["seven_day_sonnet", "Semana · Sonnet"],
+  ["seven_day", "Week"],
+  ["seven_day_opus", "Week · Opus"],
+  ["seven_day_sonnet", "Week · Sonnet"],
 ];
 
-const RENEW = "Abra o Claude Code para renovar o login.";
+const RENEW = "Open Claude Code to renew the login.";
 
 /** The usage endpoint rate limits aggressively and is shared by every caller. */
 const MIN_INTERVAL_MS = 5 * 60_000;
@@ -50,12 +50,12 @@ export function parseClaude(usage: Usage, subscriptionType: string | undefined, 
       label,
       usedPct: expired ? 0 : clampPct(raw.utilization),
       resetsAt: expired ? undefined : resetsAt,
-      detail: expired ? "reiniciou desde a última leitura" : undefined,
+      detail: expired ? "reset since last read" : undefined,
     });
   }
   const extra = usage.extra_usage;
   if (extra?.is_enabled && typeof extra.utilization === "number") {
-    windows.push({ id: "extra_usage", label: "Uso extra (mês)", usedPct: clampPct(extra.utilization) });
+    windows.push({ id: "extra_usage", label: "Extra usage (month)", usedPct: clampPct(extra.utilization) });
   }
   const plan = subscriptionType ? subscriptionType[0]!.toUpperCase() + subscriptionType.slice(1) : undefined;
   return { status: "ok" as const, plan, windows };
@@ -69,7 +69,7 @@ async function readCredentials(): Promise<OAuthCreds> {
     raw = (await file.exists()) ? await file.text() : undefined;
   }
   const creds = raw ? JSON.parse(raw)?.claudeAiOauth : undefined;
-  if (!creds?.accessToken) throw new UnavailableError(`Login do Claude Code não encontrado. ${RENEW}`);
+  if (!creds?.accessToken) throw new UnavailableError(`Claude Code login not found. ${RENEW}`);
   return creds;
 }
 
@@ -108,14 +108,14 @@ export const claude: Adapter = {
     // Never refresh the token here: refresh tokens rotate, and doing it outside
     // Claude Code would invalidate the copy Claude Code keeps in the Keychain.
     if (creds.expiresAt && creds.expiresAt <= now.getTime()) {
-      throw new UnavailableError(`Token do Claude Code expirou. ${RENEW}`);
+      throw new UnavailableError(`Claude Code token expired. ${RENEW}`);
     }
     const path = cachePath("claude-usage.json");
     const cache = await readJson<UsageCache>(path);
     if (!force && cache && now.getTime() - cache.fetchedAt < MIN_INTERVAL_MS) {
       return fromCache(cache, creds.subscriptionType, now);
     }
-    const limited = "A Anthropic limitou as consultas de uso. Nova tentativa em alguns minutos.";
+    const limited = "Anthropic rate-limited usage queries. Retrying in a few minutes.";
     if (cache?.retryAt && cache.retryAt > now.getTime()) {
       if (cache.usage) return fromCache(cache, creds.subscriptionType, now, limited);
       throw new Error(limited);
@@ -132,10 +132,10 @@ export const claude: Adapter = {
         signal: AbortSignal.timeout(8000),
       });
     } catch (err) {
-      if (cache?.usage) return fromCache(cache, creds.subscriptionType, now, "Sem conexão com api.anthropic.com.");
+      if (cache?.usage) return fromCache(cache, creds.subscriptionType, now, "No connection to api.anthropic.com.");
       throw err;
     }
-    if (res.status === 401) throw new UnavailableError(`Token do Claude Code recusado. ${RENEW}`);
+    if (res.status === 401) throw new UnavailableError(`Claude Code token rejected. ${RENEW}`);
     if (res.status === 429) {
       const retryAt = now.getTime() + retryAfterMs(res.headers.get("retry-after"), now);
       await writeJson(path, { ...(cache ?? { fetchedAt: 0 }), retryAt });
