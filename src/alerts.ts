@@ -41,7 +41,7 @@ export function evaluateAlerts(reports: HarnessReport[], previous: AlertState) {
       next[key] = Math.max(notified, crossed);
       if (crossed > notified) {
         alerts.push({
-          title: `${report.name}: ${Math.round(window.usedPct)}% usado`,
+          title: `${report.name}: ${Math.round(window.usedPct)}% used`,
           body: `${window.label} crossed ${crossed}%.`,
         });
       }

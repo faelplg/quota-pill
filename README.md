@@ -22,7 +22,7 @@ bun run uninstall-pill
 
 The LaunchAgent (`~/Library/LaunchAgents/org.quota-pill.agent.plist`) restarts the pill after a crash but respects "Quit". After changing Swift code, run `bun run install-pill` again to rebuild and restart it.
 
-## Fontes
+## Sources
 
 All sources are read without storing credentials. None of them is a public API, so any of them may change without notice. Each adapter fails independently and displays what happened in the pill.
 
@@ -33,7 +33,7 @@ All sources are read without storing credentials. None of them is a public API, 
 | Claude Code | `api.anthropic.com/api/oauth/usage` with the Keychain OAuth token | The token is never refreshed here because doing so would invalidate Claude Code's copy. If it expires, open Claude Code. |
 | Antigravity | `GetUserStatus` in the app's local language server | Works only while Antigravity is open. |
 
-## Desenvolvimento
+## Development
 
 ```sh
 bun start           # JSON report without alerts (accepts --only <harness> and --force)

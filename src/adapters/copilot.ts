@@ -59,7 +59,7 @@ export const copilot: Adapter = {
     if (res.code === 127) throw new UnavailableError("GitHub CLI (gh) was not found in PATH.");
     if (res.code !== 0) {
       if (/auth login|401/i.test(res.stderr)) {
-        throw new UnavailableError("gh sem login. Rode `gh auth login`.");
+        throw new UnavailableError("gh is not authenticated. Run `gh auth login`.");
       }
       throw new Error(res.stderr.trim().split("\n")[0] || `gh exited with code ${res.code}`);
     }
