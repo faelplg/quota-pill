@@ -44,7 +44,7 @@ await Bun.write(
   </array>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>AI_QUOTA_ROOT</key>
+    <key>QUOTA_PILL_ROOT</key>
     <string>${xml(root)}</string>
   </dict>
   <key>RunAtLoad</key>

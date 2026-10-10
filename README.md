@@ -1,4 +1,4 @@
-# AI quota
+# Quota Pill
 
 Uma pílula flutuante no macOS que mostra quanto você já usou das quotas do GitHub Copilot, Codex, Claude Code e Antigravity.
 
@@ -42,6 +42,6 @@ bun test
 bun run typecheck
 ```
 
-`src/adapters/` tem um arquivo por harness, e todos devolvem o mesmo formato (`HarnessReport` em `src/types.ts`). `src/cli.ts` junta tudo em JSON e dispara os alertas, e `src/alerts.ts` guarda em `~/Library/Caches/ai-quota/alerts.json` o que já foi notificado.
+`src/adapters/` tem um arquivo por harness, e todos devolvem o mesmo formato (`HarnessReport` em `src/types.ts`). `src/cli.ts` junta tudo em JSON e dispara os alertas, e `src/alerts.ts` guarda em `~/Library/Caches/quota-pill/alerts.json` o que já foi notificado.
 
-A pílula é um app SwiftUI em `app/`. Ela roda `bun src/cli.ts` a cada 2 minutos e ao acordar o Mac. Se o app não estiver dentro do checkout, aponte `AI_QUOTA_ROOT` para a raiz do projeto.
+A pílula é um app SwiftUI em `app/`. Ela roda `bun src/cli.ts` a cada 2 minutos e ao acordar o Mac. Se o app não estiver dentro do checkout, aponte `QUOTA_PILL_ROOT` para a raiz do projeto.
