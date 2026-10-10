@@ -20,7 +20,7 @@ bun run install-pill    # builds and starts at login (LaunchAgent)
 bun run uninstall-pill
 ```
 
-The LaunchAgent (`~/Library/LaunchAgents/org.quota-pill.agent.plist`) restarts the pill after a crash but respects "Quit". After changing Swift code, run `bun run install-pill` again to rebuild and restart it.
+The LaunchAgent (`~/Library/LaunchAgents/org.quota-pill.agent.plist`) restarts the pill after a crash but respects "Quit". After changing Swift code, run `bun run install-pill` again to rebuild and restart it. Installation and uninstallation remove older Quota Pill agents pointing to the same checkout.
 
 ## Sources
 
@@ -44,4 +44,6 @@ bun run typecheck
 
 `src/adapters/` contains one file per harness, and all adapters return the same shape (`HarnessReport` in `src/types.ts`). `src/cli.ts` combines everything into JSON and triggers alerts, while `src/alerts.ts` stores notification state in `~/Library/Caches/quota-pill/alerts.json`.
 
-The pill is a SwiftUI app in `app/`. It runs `bun src/cli.ts` every two minutes and when the Mac wakes. If the app is not inside the checkout, set `QUOTA_PILL_ROOT` to the project root.
+The pill is a SwiftUI app in `app/`. It runs `bun src/cli.ts` every two minutes and when the Mac wakes. It locates the collector relative to the running executable, without embedding the build machine's source path. If the app is not inside the checkout, set `QUOTA_PILL_ROOT` to the project root.
+
+The locally generated LaunchAgent contains absolute paths to the checkout and executable. Do not publish it, local caches, credentials, or build artifacts.
