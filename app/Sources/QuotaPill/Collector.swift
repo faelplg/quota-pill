@@ -6,7 +6,7 @@ enum CollectorError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .bunNotFound: "bun não encontrado. Instale com: brew install bun"
+        case .bunNotFound: "bun not found. Install it with: brew install bun"
         case .failed(let message): message
         }
     }
@@ -97,7 +97,7 @@ enum Collector {
                 } else {
                     let message = String(decoding: errors, as: UTF8.self)
                         .split(separator: "\n").first.map(String.init)
-                        ?? "O coletor saiu com código \(process.terminationStatus)."
+                        ?? "The collector exited with code \(process.terminationStatus)."
                     continuation.resume(throwing: CollectorError.failed(message))
                 }
             }

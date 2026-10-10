@@ -60,9 +60,9 @@ private extension PillView {
         .onHover(perform: onHover)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : .snappy(duration: 0.22), value: state.expanded)
         .contextMenu {
-            Button("Atualizar agora") { store.refresh(force: true) }
+            Button("Refresh now") { store.refresh(force: true) }
             Divider()
-            Button("Sair") { NSApp.terminate(nil) }
+            Button("Quit") { NSApp.terminate(nil) }
         }
     }
 
@@ -128,12 +128,12 @@ private extension PillView {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let updated = store.lastUpdated {
-                    Text("Atualizado às \(Format.clock(updated))")
+                    Text("Updated at \(Format.clock(updated))")
                         .foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 0)
-            RefreshButton(label: "Atualizar tudo", isActive: store.isLoading) {
+            RefreshButton(label: "Refresh all", isActive: store.isLoading) {
                 store.refresh(force: true)
             }
         }
@@ -161,21 +161,21 @@ private struct SectionView: View {
                 }
                 Spacer(minLength: 0)
                 // Revealed on hover so four idle buttons don't clutter the panel.
-                RefreshButton(label: "Atualizar \(report.name)", isActive: isRefreshing, action: onRefresh)
+                RefreshButton(label: "Refresh \(report.name)", isActive: isRefreshing, action: onRefresh)
                     .opacity(isHovered || isRefreshing ? 1 : 0)
                     .animation(.easeOut(duration: 0.15), value: isHovered)
             }
 
             if report.status == .ok {
                 if report.windows.isEmpty {
-                    note("Sem limites ativos.")
+                    note("No active limits.")
                 }
                 ForEach(report.windows) { WindowRow(window: $0) }
                 if let caveat {
                     note(caveat)
                 }
             } else {
-                Text(report.message ?? "Indisponível.")
+                Text(report.message ?? "Unavailable.")
                     .font(.system(size: 11))
                     .foregroundStyle(report.status == .error ? Palette.critical : .secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -187,7 +187,7 @@ private struct SectionView: View {
     }
 
     private var caveat: String? {
-        let parts = [report.dataAsOf.map { "Dados de \(Format.clock($0))" }, report.message].compactMap { $0 }
+        let parts = [report.dataAsOf.map { "Data from \(Format.clock($0))" }, report.message].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
@@ -258,7 +258,7 @@ private struct WindowRow: View {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     HStack {
                         if let resetsAt = window.resetsAt {
-                            Text("reinicia em \(Format.relative(to: resetsAt, from: context.date))")
+                            Text("resets in \(Format.relative(to: resetsAt, from: context.date))")
                             Spacer(minLength: 8)
                         }
                         if let detail = window.detail {

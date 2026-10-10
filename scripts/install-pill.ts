@@ -17,7 +17,7 @@ async function launchctl(...args: string[]) {
 if (process.argv.includes("--uninstall")) {
   await launchctl("bootout", `${domain}/${LABEL}`);
   await unlink(plist).catch(() => undefined);
-  console.log("Pílula removida do login.");
+  console.log("Pill removed from login.");
   process.exit(0);
 }
 
@@ -51,7 +51,7 @@ await Bun.write(
   <true/>
   <key>KeepAlive</key>
   <dict>
-    <!-- Restart after a crash, but respect "Sair" from the context menu. -->
+    <!-- Restart after a crash, but respect "Quit" from the context menu. -->
     <key>SuccessfulExit</key>
     <false/>
   </dict>
@@ -73,7 +73,7 @@ for (let attempt = 0; boot.code !== 0 && attempt < 10; attempt++) {
   boot = await launchctl("bootstrap", domain, plist);
 }
 if (boot.code !== 0) {
-  console.error(boot.stderr.trim() || `launchctl bootstrap saiu com código ${boot.code}`);
+  console.error(boot.stderr.trim() || `launchctl bootstrap exited with code ${boot.code}`);
   process.exit(1);
 }
-console.log(`Pílula instalada e iniciada: ${plist}`);
+console.log(`Pill installed and started: ${plist}`);

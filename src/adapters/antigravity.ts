@@ -18,7 +18,7 @@ interface Server {
   csrf: string;
 }
 
-const OPEN_APP = "Abra o Antigravity para ler a quota.";
+const OPEN_APP = "Open Antigravity to read the quota.";
 
 export function parseAntigravity(body: UserStatusResponse) {
   const configs = body.userStatus?.cascadeModelConfigData?.clientModelConfigs ?? [];
@@ -40,10 +40,10 @@ export function parseAntigravity(body: UserStatusResponse) {
   const windows: QuotaWindow[] = shared && entries.length > 1
     ? [{
       id: "all",
-      label: "Todos os modelos",
+      label: "All models",
       usedPct: clampPct((1 - first.remaining) * 100),
       resetsAt: first.resetTime ? new Date(first.resetTime) : undefined,
-      detail: `${entries.length} modelos`,
+      detail: `${entries.length} models`,
     }]
     : entries
       .map(([model, q]) => ({
@@ -121,6 +121,6 @@ export const antigravity: Adapter = {
         if (body) return parseAntigravity(body);
       }
     }
-    throw new Error("O Antigravity está aberto, mas o language server não respondeu.");
+    throw new Error("Antigravity is open, but the language server did not respond.");
   },
 };

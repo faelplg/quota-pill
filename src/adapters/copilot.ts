@@ -16,9 +16,9 @@ interface CopilotUser {
 }
 
 const LABELS: Record<string, string> = {
-  premium_interactions: "Premium (mês)",
-  chat: "Chat (mês)",
-  completions: "Completions (mês)",
+  premium_interactions: "Premium (month)",
+  chat: "Chat (month)",
+  completions: "Completions (month)",
 };
 
 const PLANS: Record<string, string> = {
@@ -56,12 +56,12 @@ export const copilot: Adapter = {
   short: "CP",
   async collect() {
     const res = await exec(["gh", "api", "/copilot_internal/user"]);
-    if (res.code === 127) throw new UnavailableError("GitHub CLI (gh) não encontrado no PATH.");
+    if (res.code === 127) throw new UnavailableError("GitHub CLI (gh) was not found in PATH.");
     if (res.code !== 0) {
       if (/auth login|401/i.test(res.stderr)) {
         throw new UnavailableError("gh sem login. Rode `gh auth login`.");
       }
-      throw new Error(res.stderr.trim().split("\n")[0] || `gh saiu com código ${res.code}`);
+      throw new Error(res.stderr.trim().split("\n")[0] || `gh exited with code ${res.code}`);
     }
     return parseCopilot(JSON.parse(res.stdout));
   },

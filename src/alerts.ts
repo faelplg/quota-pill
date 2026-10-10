@@ -42,7 +42,7 @@ export function evaluateAlerts(reports: HarnessReport[], previous: AlertState) {
       if (crossed > notified) {
         alerts.push({
           title: `${report.name}: ${Math.round(window.usedPct)}% usado`,
-          body: `${window.label} passou de ${crossed}%.`,
+          body: `${window.label} crossed ${crossed}%.`,
         });
       }
     }

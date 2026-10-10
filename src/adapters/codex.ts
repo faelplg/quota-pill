@@ -21,8 +21,8 @@ export interface CodexSnapshot {
 }
 
 export function windowLabel(minutes: number | undefined): string {
-  if (!minutes) return "Janela";
-  if (minutes === 10080) return "Semana";
+  if (!minutes) return "Window";
+  if (minutes === 10080) return "Week";
   if (minutes % 1440 === 0) return `${minutes / 1440}d`;
   if (minutes % 60 === 0) return `${minutes / 60}h`;
   return `${minutes}min`;
@@ -63,7 +63,7 @@ export function parseCodex(snapshot: CodexSnapshot, now: Date) {
       label: windowLabel(raw.window_minutes),
       usedPct: expired ? 0 : clampPct(raw.used_percent),
       resetsAt: expired ? undefined : resetsAt,
-      detail: expired ? "reiniciou desde o último uso" : undefined,
+      detail: expired ? "reset since last use" : undefined,
     });
   }
   const plan = snapshot.rateLimits.plan_type ?? undefined;
@@ -72,7 +72,7 @@ export function parseCodex(snapshot: CodexSnapshot, now: Date) {
     plan: plan ? plan[0]!.toUpperCase() + plan.slice(1) : undefined,
     windows,
     dataAsOf: snapshot.timestamp,
-    message: "Atualiza quando você usa o Codex.",
+    message: "Updates when you use Codex.",
   };
 }
 
@@ -108,6 +108,6 @@ export const codex: Adapter = {
       const snapshot = findLatestSnapshot(await Bun.file(file.path).text());
       if (snapshot) return parseCodex(snapshot, now);
     }
-    throw new UnavailableError("Nenhuma sessão do Codex nos últimos 8 dias. Use o Codex uma vez para registrar.");
+    throw new UnavailableError("No Codex session in the last 8 days. Use Codex once to record one.");
   },
 };

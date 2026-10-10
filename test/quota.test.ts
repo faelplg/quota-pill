@@ -62,7 +62,7 @@ describe("antigravity", () => {
       },
     });
     expect(windows).toHaveLength(1);
-    expect(windows[0]).toMatchObject({ label: "Todos os modelos", usedPct: 50, detail: "2 modelos" });
+    expect(windows[0]).toMatchObject({ label: "All models", usedPct: 50, detail: "2 models" });
   });
 });
 
@@ -95,7 +95,7 @@ describe("codex", () => {
       },
       now,
     );
-    expect(windows.map((w) => [w.label, w.usedPct])).toEqual([["5h", 0], ["Semana", 40]]);
+    expect(windows.map((w) => [w.label, w.usedPct])).toEqual([["5h", 0], ["Week", 40]]);
   });
 });
 
@@ -110,13 +110,13 @@ describe("alerts", () => {
 
   test("notifies once per threshold and re-arms on a new reset cycle", () => {
     const first = evaluateAlerts([report(82)], {});
-    expect(first.alerts.map((a) => a.body)).toEqual(["5h passou de 80%."]);
+    expect(first.alerts.map((a) => a.body)).toEqual(["5h crossed 80%."]);
 
     const jittered = evaluateAlerts([report(85, new Date("2026-10-10T05:30:00.301Z"))], first.next);
     expect(jittered.alerts).toEqual([]);
 
     const critical = evaluateAlerts([report(96)], jittered.next);
-    expect(critical.alerts.map((a) => a.body)).toEqual(["5h passou de 95%."]);
+    expect(critical.alerts.map((a) => a.body)).toEqual(["5h crossed 95%."]);
 
     const nextCycle = evaluateAlerts([report(81, new Date("2026-10-10T10:30:00Z"))], critical.next);
     expect(nextCycle.alerts).toHaveLength(1);
@@ -134,4 +134,3 @@ describe("alerts", () => {
     expect(evaluateAlerts([report(90)], offline.next).alerts).toEqual([]);
   });
 });
-
