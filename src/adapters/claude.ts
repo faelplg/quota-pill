@@ -103,7 +103,7 @@ export const claude: Adapter = {
   harness: "claude",
   name: "Claude Code",
   short: "CC",
-  async collect(now) {
+  async collect(now, { force }) {
     const creds = await readCredentials();
     // Never refresh the token here: refresh tokens rotate, and doing it outside
     // Claude Code would invalidate the copy Claude Code keeps in the Keychain.
@@ -112,7 +112,7 @@ export const claude: Adapter = {
     }
     const path = cachePath("claude-usage.json");
     const cache = await readJson<UsageCache>(path);
-    if (cache && now.getTime() - cache.fetchedAt < MIN_INTERVAL_MS) {
+    if (!force && cache && now.getTime() - cache.fetchedAt < MIN_INTERVAL_MS) {
       return fromCache(cache, creds.subscriptionType, now);
     }
     const limited = "A Anthropic limitou as consultas de uso. Nova tentativa em alguns minutos.";

@@ -24,11 +24,16 @@ export interface HarnessReport {
   dataAsOf?: Date;
 }
 
+export interface CollectOptions {
+  /** Skip local caches; set when the user explicitly asks for fresh data. */
+  force?: boolean;
+}
+
 export interface Adapter {
   harness: HarnessId;
   name: string;
   short: string;
-  collect(now: Date): Promise<Omit<HarnessReport, "harness" | "name" | "short">>;
+  collect(now: Date, options: CollectOptions): Promise<Omit<HarnessReport, "harness" | "name" | "short">>;
 }
 
 /** Thrown for expected, user-fixable conditions; the message is shown as is. */

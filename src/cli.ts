@@ -1,22 +1,43 @@
+import { parseArgs } from "node:util";
 import { evaluateAlerts, loadState, notify, saveState } from "./alerts.ts";
-import { collectAll } from "./collect.ts";
+import { adapters, collectAll } from "./collect.ts";
+import type { HarnessId } from "./types.ts";
 
-const USAGE = `Uso: bun src/cli.ts [--no-alerts]
+const HARNESSES = adapters.map((a) => a.harness);
 
-  Imprime o relatório normalizado de todas as fontes, em JSON, e notifica
-  quando uma quota cruza 80% ou 95%.
+const USAGE = `Uso: bun src/cli.ts [--only <harness>] [--force] [--no-alerts]
 
-  --no-alerts  Não envia notificações nem altera o estado dos alertas`;
+  Imprime o relatório normalizado das fontes, em JSON, e notifica quando
+  uma quota cruza 80% ou 95%.
+
+  --only <harness>  Consulta só esse harness (${HARNESSES.join(", ")}); pode repetir
+  --force           Ignora caches locais e consulta a fonte agora
+  --no-alerts       Não envia notificações nem altera o estado dos alertas`;
 
 async function main(argv: string[]): Promise<number> {
-  if (argv.some((a) => a !== "--no-alerts")) {
+  let values;
+  try {
+    ({ values } = parseArgs({
+      args: argv,
+      options: {
+        only: { type: "string", multiple: true },
+        force: { type: "boolean" },
+        "no-alerts": { type: "boolean" },
+      },
+    }));
+  } catch {
+    console.error(USAGE);
+    return 2;
+  }
+  const only = values.only as HarnessId[] | undefined;
+  if (only?.some((h) => !HARNESSES.includes(h))) {
     console.error(USAGE);
     return 2;
   }
 
-  const reports = await collectAll();
+  const reports = await collectAll(new Date(), { only, force: values.force });
 
-  if (!argv.includes("--no-alerts")) {
+  if (!values["no-alerts"]) {
     const { alerts, next } = evaluateAlerts(reports, await loadState());
     await Promise.all(alerts.map(notify));
     await saveState(next);

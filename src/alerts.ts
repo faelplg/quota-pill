@@ -21,6 +21,11 @@ function cycleKey(harness: string, windowId: string, resetsAt?: Date): string {
 export function evaluateAlerts(reports: HarnessReport[], previous: AlertState) {
   const next: AlertState = {};
   const alerts: Alert[] = [];
+  // A partial refresh must not forget what was notified for the other sources.
+  const present = new Set(reports.map((r) => `${r.harness}:`));
+  for (const [key, value] of Object.entries(previous)) {
+    if (![...present].some((prefix) => key.startsWith(prefix))) next[key] = value;
+  }
   for (const report of reports) {
     if (report.status !== "ok") {
       // Keep state for sources that are temporarily unreachable.
