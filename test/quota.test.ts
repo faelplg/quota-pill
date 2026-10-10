@@ -1,11 +1,35 @@
 import { describe, expect, test } from "bun:test";
 import { parseAntigravity } from "../src/adapters/antigravity.ts";
+import { parseClaude, retryAfterMs } from "../src/adapters/claude.ts";
 import { findLatestSnapshot, parseCodex } from "../src/adapters/codex.ts";
 import { evaluateAlerts } from "../src/alerts.ts";
 import { renderTitle } from "../src/render.ts";
 import type { HarnessReport } from "../src/types.ts";
 
 const now = new Date("2026-10-10T03:00:00Z");
+
+describe("claude", () => {
+  test("resets windows whose cached reset time has passed", () => {
+    const { windows } = parseClaude(
+      {
+        five_hour: { utilization: 77, resets_at: "2026-10-10T02:30:00Z" },
+        seven_day: { utilization: 17, resets_at: "2026-10-16T14:00:00Z" },
+      },
+      "max",
+      now,
+    );
+    expect(windows.map((w) => [w.id, w.usedPct, w.resetsAt !== undefined])).toEqual([
+      ["five_hour", 0, false],
+      ["seven_day", 17, true],
+    ]);
+  });
+
+  test("honors retry-after in seconds or as a date, with a default backoff", () => {
+    expect(retryAfterMs("90", now)).toBe(90_000);
+    expect(retryAfterMs("Sat, 10 Oct 2026 03:02:00 GMT", now)).toBe(120_000);
+    expect(retryAfterMs(null, now)).toBe(600_000);
+  });
+});
 
 describe("antigravity", () => {
   test("treats an omitted remainingFraction as exhausted", () => {
