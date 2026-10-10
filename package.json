@@ -3,11 +3,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun src/cli.ts",
-    "json": "bun src/cli.ts json --no-alerts",
+    "start": "bun src/cli.ts --no-alerts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "install-plugin": "bun scripts/install-plugin.ts",
     "pill": "swift build -c release --package-path app && app/.build/release/QuotaPill",
     "build:pill": "swift build -c release --package-path app",
     "install-pill": "bun scripts/install-pill.ts",

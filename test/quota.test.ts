@@ -3,7 +3,6 @@ import { parseAntigravity } from "../src/adapters/antigravity.ts";
 import { parseClaude, retryAfterMs } from "../src/adapters/claude.ts";
 import { findLatestSnapshot, parseCodex } from "../src/adapters/codex.ts";
 import { evaluateAlerts } from "../src/alerts.ts";
-import { renderTitle } from "../src/render.ts";
 import type { HarnessReport } from "../src/types.ts";
 
 const now = new Date("2026-10-10T03:00:00Z");
@@ -130,16 +129,3 @@ describe("alerts", () => {
   });
 });
 
-test("menu bar title is blue until a quota crosses a threshold", () => {
-  const base = { name: "", windows: [] };
-  const ok = (usedPct: number) => ({
-    ...base, harness: "copilot" as const, short: "CP", status: "ok" as const,
-    windows: [{ id: "p", label: "p", usedPct }],
-  });
-  const others: HarnessReport[] = [
-    { ...base, harness: "codex", short: "CX", status: "error" },
-    { ...base, harness: "antigravity", short: "AG", status: "unavailable" },
-  ];
-  expect(renderTitle([ok(46.4), ...others])).toBe("CP 46  CX !  AG – | color=#0A6CDB,#5AA9FF");
-  expect(renderTitle([ok(96), ...others])).toBe("CP 96  CX !  AG – | color=#E5484D");
-});

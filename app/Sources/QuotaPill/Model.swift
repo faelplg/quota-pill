@@ -31,7 +31,7 @@ struct HarnessReport: Decodable, Identifiable, Equatable {
     }
 }
 
-/// Mirrors the thresholds in src/render.ts so both surfaces agree.
+/// Mirrors THRESHOLDS in src/alerts.ts so colors and notifications agree.
 enum Level {
     case normal, warn, critical
 

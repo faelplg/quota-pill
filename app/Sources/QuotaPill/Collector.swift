@@ -48,7 +48,7 @@ enum Collector {
         else { throw CollectorError.bunNotFound }
 
         let cli = projectRoot.appendingPathComponent("src/cli.ts").path
-        let data = try await run(bun, arguments: [cli, "json", "--no-alerts"])
+        let data = try await run(bun, arguments: [cli])
         return try decoder.decode([HarnessReport].self, from: data)
     }
 
