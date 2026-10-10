@@ -41,6 +41,12 @@ bun run typecheck
 
 `src/adapters/` tem um arquivo por harness, e todos devolvem o mesmo formato (`HarnessReport` em `src/types.ts`). `src/render.ts` gera a saída do SwiftBar, e `src/alerts.ts` guarda em `~/Library/Caches/ai-quota/alerts.json` o que já foi notificado.
 
-## Próxima fase
+## Janela flutuante
 
-Uma janela flutuante sempre visível, consumindo o mesmo `bun src/cli.ts json`.
+Uma pílula sempre visível com os mesmos indicadores, inclusive sobre apps em tela cheia. Ao passar o mouse, ela expande com o detalhe de cada janela. Dá para arrastá-la, e a posição fica salva. O clique direito oferece "Atualizar agora" e "Sair".
+
+```sh
+bun run pill
+```
+
+É um app SwiftUI em `app/` (requer macOS 26 e Xcode ou Command Line Tools). Ele roda `bun src/cli.ts json --no-alerts` a cada 2 minutos e ao acordar o Mac, então os alertas continuam vindo só do plugin. Se o app não estiver dentro do checkout, aponte `AI_QUOTA_ROOT` para a raiz do projeto.

@@ -1,0 +1,242 @@
+import AppKit
+import SwiftUI
+
+private let links: [String: URL] = [
+    "copilot": URL(string: "https://github.com/settings/billing/premium_requests_usage")!,
+    "codex": URL(string: "https://chatgpt.com/codex/settings/usage")!,
+    "claude": URL(string: "https://claude.ai/settings/usage")!,
+]
+
+private let cardRadius: CGFloat = 14
+private let detailsWidth: CGFloat = 300
+
+struct PillView: View {
+    let store: QuotaStore
+    let state: PanelState
+    let onSize: (CGSize) -> Void
+    let onHover: (Bool) -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        card
+            .fixedSize()
+            .onGeometryChange(for: CGSize.self, of: \.size) { onSize($0) }
+            // While the window waits to shrink, keep the card pinned to its anchor corner.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: anchor)
+    }
+
+    private var anchor: Alignment {
+        switch (state.expandsUp, state.alignTrailing) {
+        case (false, false): .topLeading
+        case (false, true): .topTrailing
+        case (true, false): .bottomLeading
+        case (true, true): .bottomTrailing
+        }
+    }
+}
+
+private extension Alignment {
+    var unitPoint: UnitPoint {
+        switch self {
+        case .topTrailing: .topTrailing
+        case .bottomLeading: .bottomLeading
+        case .bottomTrailing: .bottomTrailing
+        default: .topLeading
+        }
+    }
+}
+
+private extension PillView {
+
+    private var card: some View {
+        VStack(alignment: state.alignTrailing ? .trailing : .leading, spacing: 0) {
+            if state.expanded && state.expandsUp { details }
+            summary
+            if state.expanded && !state.expandsUp { details }
+        }
+        .glassEffect(.regular, in: .rect(cornerRadius: cardRadius))
+        .contentShape(.rect(cornerRadius: cardRadius))
+        .onHover(perform: onHover)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : .snappy(duration: 0.22), value: state.expanded)
+        .contextMenu {
+            Button("Atualizar agora") { store.refresh() }
+            Divider()
+            Button("Sair") { NSApp.terminate(nil) }
+        }
+    }
+
+    private var summary: some View {
+        HStack(spacing: 12) {
+            if store.reports.isEmpty {
+                Text("AI")
+                    .foregroundStyle(.secondary)
+                Text(store.failure == nil ? "···" : "!")
+                    .foregroundStyle(store.failure == nil ? Color.secondary : Palette.critical)
+            } else {
+                ForEach(store.reports) { report in
+                    HStack(spacing: 4) {
+                        Text(report.short)
+                            .foregroundStyle(.secondary)
+                        indicator(for: report)
+                    }
+                }
+            }
+        }
+        .font(.system(size: 12, weight: .semibold))
+        .monospacedDigit()
+        .padding(.horizontal, 12)
+        .frame(height: 28)
+    }
+
+    @ViewBuilder
+    private func indicator(for report: HarnessReport) -> some View {
+        if report.status == .error {
+            Text("!").foregroundStyle(Palette.critical)
+        } else if let pct = report.worstPct {
+            Text("\(Int(pct.rounded()))")
+                .foregroundStyle(Level(pct).color)
+                .contentTransition(.numericText(value: pct))
+        } else {
+            Text("–").foregroundStyle(.tertiary)
+        }
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(store.reports) { SectionView(report: $0) }
+            footer
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .frame(width: detailsWidth, alignment: .leading)
+        .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96, anchor: anchor.unitPoint)))
+    }
+
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let failure = store.failure {
+                Text(failure)
+                    .foregroundStyle(Palette.critical)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let updated = store.lastUpdated {
+                Text("Atualizado às \(Format.clock(updated))")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .font(.system(size: 11))
+    }
+}
+
+private struct SectionView: View {
+    let report: HarnessReport
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(report.name)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Palette.accent)
+                if let plan = report.plan {
+                    Text(plan)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if report.status == .ok {
+                if report.windows.isEmpty {
+                    note("Sem limites ativos.")
+                }
+                ForEach(report.windows) { WindowRow(window: $0) }
+                if let caveat {
+                    note(caveat)
+                }
+            } else {
+                Text(report.message ?? "Indisponível.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(report.status == .error ? Palette.critical : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .contentShape(.rect)
+        .onTapGesture(perform: open)
+    }
+
+    private var caveat: String? {
+        let parts = [report.dataAsOf.map { "Dados de \(Format.clock($0))" }, report.message].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func open() {
+        if let url = links[report.harness] {
+            NSWorkspace.shared.open(url)
+        } else if report.harness == "antigravity",
+                  let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.antigravity") {
+            NSWorkspace.shared.openApplication(at: app, configuration: .init())
+        }
+    }
+}
+
+private struct WindowRow: View {
+    let window: QuotaWindow
+
+    var body: some View {
+        let level = Level(window.usedPct)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(window.label)
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 8)
+                Text("\(Int(window.usedPct.rounded()))%")
+                    .monospacedDigit()
+                    .foregroundStyle(level.color)
+            }
+            .font(.system(size: 12))
+
+            ProgressBar(fraction: window.usedPct / 100, color: level.color)
+
+            if window.resetsAt != nil || window.detail != nil {
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    HStack {
+                        if let resetsAt = window.resetsAt {
+                            Text("reinicia em \(Format.relative(to: resetsAt, from: context.date))")
+                            Spacer(minLength: 8)
+                        }
+                        if let detail = window.detail {
+                            Text(detail).monospacedDigit()
+                        }
+                    }
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private struct ProgressBar: View {
+    let fraction: Double
+    let color: Color
+
+    var body: some View {
+        Capsule()
+            .fill(.primary.opacity(0.1))
+            .overlay(alignment: .leading) {
+                GeometryReader { proxy in
+                    Capsule()
+                        .fill(color)
+                        .frame(width: max(fraction > 0 ? 4 : 0, proxy.size.width * min(1, fraction)))
+                }
+            }
+            .frame(height: 4)
+    }
+}
