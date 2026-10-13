@@ -22,6 +22,19 @@ jobs:
       - run: bun run typecheck
       - run: bun test
 
+  claude-plugin:
+    runs-on: ubuntu-latest
+    env:
+      # Pinned because mod events and methods can change between releases.
+      CLAUDE_CODE: "@anthropic-ai/claude-code@2.1.296"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bunx "$CLAUDE_CODE" plugin validate .
+      - run: bunx "$CLAUDE_CODE" plugin validate plugins/quota-pill
+      - run: bunx "$CLAUDE_CODE" plugin test
+        working-directory: plugins/quota-pill
+
   pill:
     strategy:
       fail-fast: false

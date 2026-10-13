@@ -43,31 +43,55 @@ To remove it:
 bun run uninstall-pill
 ```
 
+### Claude Code plugin
+
+Claude Code reports your plan usage only to code running inside it, so the Claude Code numbers come from a small plugin in this repository. Install it once:
+
+```sh
+claude plugin marketplace add faelplg/quota-pill
+claude plugin install quota-pill@quota-pill
+```
+
+Inside a session, `/plugin marketplace add faelplg/quota-pill` and `/plugin install quota-pill@quota-pill` do the same. Claude Code keeps a copy of the installed version, so update it when the plugin changes:
+
+```sh
+claude plugin marketplace update quota-pill
+claude plugin update quota-pill@quota-pill
+```
+
+If your Claude Code settings are managed declaratively (for example with Nix), load the plugin straight from your checkout instead. It then updates with `git pull`:
+
+```json
+{
+  "env": { "CLAUDE_CODE_PLUGIN_DIRS": "/path/to/quota-pill/plugins/quota-pill" }
+}
+```
+
+The plugin is a [mod](https://code.claude.com/docs/en/plugins/mods/overview) with one hook. After each turn, and whenever a plan window moves, it writes the windows Claude Code measured to `~/Library/Caches/quota-pill/claude-rate-limits.json`. It needs no credentials and makes no network requests. Tested end to end with Claude Code 2.1.286, and CI checks it against 2.1.296. To remove it, run `claude plugin uninstall quota-pill@quota-pill`.
+
 ## Sources
 
-None of these is a public API, so any of them may change without notice. Each adapter fails independently and shows what happened in the pill.
+Only the Claude Code source is a documented interface. The others are not public APIs and may change without notice. Each adapter fails independently and shows what happened in the pill.
 
 | Harness | Source | Setup |
 | --- | --- | --- |
 | Copilot | `gh api /copilot_internal/user` | Install the [GitHub CLI](https://cli.github.com) and run `gh auth login`. |
 | Codex | Latest `rate_limits` event in `~/.codex/sessions` (or `$CODEX_HOME`) | None. Updates only when you use Codex. Windows whose reset has passed are shown as zero. |
-| Claude Code | `api.anthropic.com/api/oauth/usage` with Claude Code's OAuth token | Sign in to Claude Code. The token is read from the Keychain, or from `~/.claude/.credentials.json`. |
+| Claude Code | Plan windows recorded by the [Claude Code plugin](#claude-code-plugin) | Install the plugin. Updates only when you use Claude Code, on a Pro or Max plan. Windows whose reset has passed are shown as zero. |
 | Antigravity | `GetUserStatus` in the app's local language server | None. Works only while Antigravity is open. |
 
 ## Privacy
 
-Quota Pill has no server and no telemetry. It reads credentials that other tools already store and never saves them anywhere.
+Quota Pill has no server and no telemetry, and it never reads or stores credentials itself.
 
-- The only network requests go to GitHub (through `gh`), to `api.anthropic.com`, and to Antigravity's language server on `127.0.0.1`. Codex is read from local files.
-- The Claude Code token is never refreshed, because refresh tokens rotate and doing it outside Claude Code would invalidate Claude Code's own copy. If it expires, open Claude Code. Requests identify as the installed Claude Code version, since the endpoint rejects other clients.
-- Usage responses and alert state are cached in `~/Library/Caches/quota-pill/` (or `$XDG_CACHE_HOME/quota-pill/`).
+- The only network requests go to GitHub, through `gh` and its own login, and to Antigravity's language server on `127.0.0.1`. Codex and Claude Code are read from local files.
+- Usage snapshots and alert state are kept in `~/Library/Caches/quota-pill/` (or `$XDG_CACHE_HOME/quota-pill/`).
 
 ## Troubleshooting
 
-- **macOS asks for Keychain access.** The collector reads the "Claude Code-credentials" item with `security`. Choose "Always Allow" to stop the prompt from coming back.
+- **Claude Code shows "No Claude Code usage recorded yet".** Check that `claude plugin list` shows `quota-pill@quota-pill` as enabled (or that `CLAUDE_CODE_PLUGIN_DIRS` points to the plugin), then send a message in Claude Code. On an API key instead of a Pro or Max plan there are no plan windows to show. Organizations that allow only managed mods block the plugin.
 - **"bun not found".** The pill looks for Bun in `~/.bun/bin`, Homebrew, `/usr/local/bin`, and Nix profiles. Install it in one of those places.
 - **"Cannot locate the collector".** The app finds `src/cli.ts` by walking up from its executable. If you run a copy outside the checkout, set `QUOTA_PILL_ROOT` to the project root.
-- **Claude Code shows a rate limit.** Anthropic limits the usage endpoint for every client using the same token. The pill queries it at most every five minutes and backs off when asked to.
 - **To see raw data**, run `bun start` in the checkout. It prints the same JSON the pill reads.
 
 ## Development
@@ -81,13 +105,22 @@ bun run typecheck
 
 `src/adapters/` contains one file per harness, and all adapters return the same shape (`HarnessReport` in `src/types.ts`). `src/cli.ts` combines everything into JSON and triggers alerts, while `src/alerts.ts` stores notification state in the cache folder.
 
+The Claude Code plugin lives in `plugins/quota-pill/`, and the repository root is its marketplace. Its tests run with Claude Code's own test kit:
+
+```sh
+claude plugin validate .
+cd plugins/quota-pill && claude plugin test
+```
+
+To try a change in a session without installing it, run `claude --plugin-dir plugins/quota-pill`.
+
 The pill is a SwiftUI app in `app/`. It runs `bun src/cli.ts` every two minutes and when the Mac wakes. After changing Swift code, run `bun run install-pill` again to rebuild and restart it.
 
 The locally generated LaunchAgent contains absolute paths to your checkout. Do not commit it, local caches, credentials, or build artifacts.
 
 ## Contributing
 
-Issues and pull requests are welcome. Run `bun test` and `bun run typecheck` before opening a PR. CI also builds the pill on macOS 15 and macOS 26. A new harness is a new file in `src/adapters/` plus its tests in `test/`.
+Issues and pull requests are welcome. Run `bun test` and `bun run typecheck` before opening a PR, and `claude plugin test` if you changed the plugin. CI also builds the pill on macOS 15 and macOS 26. A new harness is a new file in `src/adapters/` plus its tests in `test/`.
 
 ## Disclaimer
 

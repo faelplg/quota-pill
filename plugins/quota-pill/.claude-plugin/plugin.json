@@ -1,0 +1,8 @@
+{
+  "name": "quota-pill",
+  "version": "0.1.0",
+  "description": "Records your Claude Code plan usage for the Quota Pill macOS app",
+  "author": { "name": "Quota Pill contributors" },
+  "homepage": "https://github.com/faelplg/quota-pill",
+  "license": "MIT"
+}

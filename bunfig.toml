@@ -1,0 +1,3 @@
+[test]
+# Plugin tests import claude-code/testing and run with `claude plugin test`.
+root = "test"
