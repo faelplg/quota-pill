@@ -40,7 +40,7 @@ test("writes in place when the move fails", async ($, on) => {
   expect(writes[1]).toBe(snapshot);
 });
 
-test("honors XDG_CACHE_HOME", async ($, on) => {
+test("ignores XDG_CACHE_HOME, which the pill's LaunchAgent does not see", async ($, on) => {
   const runs: string[][] = [];
   mock.env(on, { HOME: "/Users/someone", XDG_CACHE_HOME: "/tmp/cache" });
   mock.clock(on);
@@ -50,15 +50,28 @@ test("honors XDG_CACHE_HOME", async ($, on) => {
 
   await $.session.measure(measured);
 
-  expect(runs[0]![3]).toBe("/tmp/cache/quota-pill/claude-rate-limits.json");
+  expect(runs[0]![3]).toBe(snapshot);
 });
 
-test("records nothing off a subscription and still passes the event on", async ($, on) => {
+test("records nothing before the first reading and still passes the event on", async ($, on) => {
   on("session.measure", ($, e) => ({ changed: e.changed }));
 
   const result = await $.session.measure({ ...measured, rateLimits: [], changed: ["context"] });
 
   expect(result).toEqual({ changed: ["context"] });
+});
+
+test("records an empty list when the plan's windows go away", async ($, on) => {
+  const texts: string[] = [];
+  mock.env(on, { HOME: "/Users/someone" });
+  mock.clock(on);
+  on("fs.write", ($, e) => (texts.push(e.text), { value: undefined }));
+  on("process.run", () => ran(0));
+  on("session.measure", ($, e) => ({ changed: e.changed }));
+
+  await $.session.measure({ ...measured, rateLimits: [] });
+
+  expect(JSON.parse(texts[0]!).rateLimits).toEqual([]);
 });
 
 test("a failed write never breaks the event", async ($, on) => {

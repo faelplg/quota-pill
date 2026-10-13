@@ -19,12 +19,13 @@ export interface RateLimitSnapshot {
   rateLimits: RateLimit[];
 }
 
-export const SNAPSHOT_FILE = "claude-rate-limits.json";
-
-/** Mirrors cachePath in src/cache.ts, which the plugin cannot import. */
-export function snapshotPath(home: string, xdgCacheHome: string | undefined): string {
-  const base = xdgCacheHome || `${home}/Library/Caches`;
-  return `${base}/quota-pill/${SNAPSHOT_FILE}`;
+/**
+ * Fixed under the home folder on purpose. Claude Code and the pill's
+ * LaunchAgent run with different environments, so a variable such as
+ * XDG_CACHE_HOME could point each side at a different file.
+ */
+export function snapshotPath(home: string): string {
+  return `${home}/Library/Caches/quota-pill/claude-rate-limits.json`;
 }
 
 export function toSnapshot(rateLimits: readonly RateLimit[], capturedAt: Date): RateLimitSnapshot {

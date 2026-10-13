@@ -6,7 +6,9 @@ type Api = Parameters<Hook<"session.measure">>[0];
 /** Records the plan windows Claude Code measures, for the pill to read. */
 export function register(on: On) {
   on("session.measure", async ($, e, next) => {
-    if (e.rateLimits.length > 0) {
+    // An empty list is recorded only when it is news, such as leaving a Pro or
+    // Max plan, so a new session's first measurement never clears the pill.
+    if (e.rateLimits.length > 0 || e.changed.includes("rateLimits")) {
       try {
         await record($, e.rateLimits);
       } catch {
@@ -20,7 +22,7 @@ export function register(on: On) {
 async function record($: Api, rateLimits: readonly SessionRateLimit[]) {
   const home = await $.env.get("HOME");
   if (!home) return;
-  const path = snapshotPath(home, await $.env.get("XDG_CACHE_HOME"));
+  const path = snapshotPath(home);
   const text = JSON.stringify(toSnapshot(rateLimits, new Date(await $.clock.now())));
 
   // $.fs.write replaces content in place, so write beside the file and move it

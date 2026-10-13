@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { homedir } from "node:os";
-import { SNAPSHOT_FILE, snapshotPath } from "../plugins/quota-pill/hooks/snapshot.ts";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { snapshotPath } from "../plugins/quota-pill/hooks/snapshot.ts";
 import { parseAntigravity } from "../src/adapters/antigravity.ts";
 import { parseClaude } from "../src/adapters/claude.ts";
 import { findLatestSnapshot, parseCodex } from "../src/adapters/codex.ts";
 import { evaluateAlerts } from "../src/alerts.ts";
-import { cachePath } from "../src/cache.ts";
 import type { HarnessReport } from "../src/types.ts";
 
 const now = new Date("2026-10-10T03:00:00Z");
@@ -46,10 +47,31 @@ describe("claude", () => {
     ]);
   });
 
-  test("reads the snapshot from the same place the plugin writes it", () => {
-    const home = homedir();
-    expect(snapshotPath(home, undefined)).toBe(cachePath(SNAPSHOT_FILE));
+  test("the collector reads the snapshot under HOME and explains an empty one", async () => {
+    const home = await mkdtemp(join(tmpdir(), "quota-pill-home-"));
+    const collect = async () => {
+      const cli = join(import.meta.dir, "..", "src", "cli.ts");
+      const child = Bun.spawn([process.execPath, cli, "--only", "claude", "--no-alerts"], {
+        // A different XDG_CACHE_HOME must not move the snapshot the plugin writes.
+        env: { ...Bun.env, HOME: home, XDG_CACHE_HOME: join(home, "elsewhere") },
+        stdout: "pipe",
+      });
+      const [report] = JSON.parse(await new Response(child.stdout).text()) as HarnessReport[];
+      return report!;
+    };
+    const write = (rateLimits: unknown[]) =>
+      Bun.write(snapshotPath(home), JSON.stringify({ capturedAt: now.toISOString(), rateLimits }));
+    try {
+      expect((await collect()).message).toStartWith("No Claude Code usage recorded yet");
+      await write([]);
+      expect((await collect()).message).toContain("only on Pro and Max plans");
+      await write([{ kind: "five_hour", percentUsed: 12 }]);
+      expect((await collect()).windows.map((w) => w.usedPct)).toEqual([12]);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
   });
+
 });
 
 describe("antigravity", () => {

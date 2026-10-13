@@ -1,5 +1,6 @@
-import { SNAPSHOT_FILE, type RateLimitSnapshot } from "../../plugins/quota-pill/hooks/snapshot.ts";
-import { cachePath, readJson } from "../cache.ts";
+import { homedir } from "node:os";
+import { snapshotPath, type RateLimitSnapshot } from "../../plugins/quota-pill/hooks/snapshot.ts";
+import { readJson } from "../cache.ts";
 import { clampPct, UnavailableError, type Adapter, type QuotaWindow } from "../types.ts";
 
 /** Known windows, in display order. Unknown kinds follow, labeled as reported. */
@@ -47,11 +48,14 @@ export const claude: Adapter = {
   name: "Claude Code",
   short: "CC",
   async collect(now) {
-    const snapshot = await readJson<RateLimitSnapshot>(cachePath(SNAPSHOT_FILE));
-    if (!snapshot?.rateLimits?.length) {
+    const snapshot = await readJson<RateLimitSnapshot>(snapshotPath(homedir()));
+    if (!snapshot) {
       throw new UnavailableError(
         "No Claude Code usage recorded yet. Install the quota-pill plugin in Claude Code and send a message.",
       );
+    }
+    if (!snapshot.rateLimits?.length) {
+      throw new UnavailableError("Claude Code reports no plan limits. They exist only on Pro and Max plans.");
     }
     return parseClaude(snapshot, now);
   },

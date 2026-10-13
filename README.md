@@ -85,7 +85,7 @@ Only the Claude Code source is a documented interface. The others are not public
 Quota Pill has no server and no telemetry, and it never reads or stores credentials itself.
 
 - The only network requests go to GitHub, through `gh` and its own login, and to Antigravity's language server on `127.0.0.1`. Codex and Claude Code are read from local files.
-- Usage snapshots and alert state are kept in `~/Library/Caches/quota-pill/` (or `$XDG_CACHE_HOME/quota-pill/`).
+- Alert state and other caches are kept in `~/Library/Caches/quota-pill/` (or `$XDG_CACHE_HOME/quota-pill/`). The Claude Code snapshot always stays in `~/Library/Caches/quota-pill/`, because Claude Code and the pill's LaunchAgent do not share environment variables.
 
 ## Troubleshooting
 
