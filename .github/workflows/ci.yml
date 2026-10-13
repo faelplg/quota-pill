@@ -23,8 +23,18 @@ jobs:
       - run: bun test
 
   pill:
-    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest supported system, with the oldest Xcode that has Swift 6.2.
+          - runner: macos-15
+            xcode: /Applications/Xcode_26.0.1.app
+          - runner: macos-26
+    runs-on: ${{ matrix.runner }}
     steps:
+      - if: matrix.xcode
+        run: sudo xcode-select -s "${{ matrix.xcode }}"
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile

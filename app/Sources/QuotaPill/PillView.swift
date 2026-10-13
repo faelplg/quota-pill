@@ -47,6 +47,48 @@ private extension Alignment {
     }
 }
 
+private extension View {
+    /// Liquid Glass where available, and the closest system material before macOS 26.
+    @ViewBuilder
+    func cardBackground() -> some View {
+        if #available(macOS 26, *) {
+            glassEffect(.regular, in: .rect(cornerRadius: cardRadius))
+        } else {
+            background(BlurBackground(cornerRadius: cardRadius))
+        }
+    }
+}
+
+/// Blurs the desktop behind the panel. SwiftUI materials follow the window's
+/// active state, and this panel is never active, so they would render flat.
+private struct BlurBackground: NSViewRepresentable {
+    let cornerRadius: CGFloat
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.maskImage = mask
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+
+    /// A stretchable rounded rectangle, the documented way to shape the blur.
+    private var mask: NSImage {
+        let edge = cornerRadius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: cornerRadius, left: cornerRadius, bottom: cornerRadius, right: cornerRadius)
+        image.resizingMode = .stretch
+        return image
+    }
+}
+
 private extension PillView {
 
     private var card: some View {
@@ -55,7 +97,7 @@ private extension PillView {
             summary
             if state.expanded && !state.expandsUp { details }
         }
-        .glassEffect(.regular, in: .rect(cornerRadius: cardRadius))
+        .cardBackground()
         .contentShape(.rect(cornerRadius: cardRadius))
         .onHover(perform: onHover)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : .snappy(duration: 0.22), value: state.expanded)
