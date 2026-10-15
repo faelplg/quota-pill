@@ -6,7 +6,7 @@ import { snapshotPath } from "../plugins/quota-pill/hooks/snapshot.ts";
 import { parseAntigravity } from "../src/adapters/antigravity.ts";
 import { parseClaude } from "../src/adapters/claude.ts";
 import { findLatestSnapshot, parseCodex } from "../src/adapters/codex.ts";
-import { parseCopilot } from "../src/adapters/copilot.ts";
+import { billingFailureMessage, parseCopilot } from "../src/adapters/copilot.ts";
 import { evaluateAlerts } from "../src/alerts.ts";
 import type { HarnessReport } from "../src/types.ts";
 
@@ -153,6 +153,22 @@ describe("copilot", () => {
   test("omits the extra window when overage is not permitted", () => {
     const { windows } = parseCopilot(user({ ...overage, overage_permitted: false }), summary);
     expect(windows.map((w) => w.id)).toEqual(["premium_interactions"]);
+  });
+
+  test("suggests a scope refresh only when the user scope is missing", () => {
+    const missingScope = [
+      "gh: Not Found (HTTP 404)",
+      'gh: This API operation needs the "user" scope. To request it, run:  gh auth refresh -h github.com -s user',
+    ].join("\n");
+    expect(billingFailureMessage(missingScope, 1)).toBe(
+      "Run `gh auth refresh -h github.com -s user` to see extra spend in dollars.",
+    );
+    expect(billingFailureMessage("gh: Server Error (HTTP 502)\n", 1)).toBe(
+      "Extra spend shown in units. Billing request failed: gh: Server Error (HTTP 502)",
+    );
+    expect(billingFailureMessage("", 143)).toBe(
+      "Extra spend shown in units. Billing request failed: gh exited with code 143",
+    );
   });
 });
 

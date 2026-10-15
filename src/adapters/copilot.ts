@@ -88,6 +88,17 @@ export function parseCopilot(user: CopilotUser, billing?: BillingSummary) {
   return { status: "ok" as const, plan, windows };
 }
 
+/** Leaves room inside the collector deadline after the quota request, so a slow billing call keeps the quota windows. */
+const BILLING_TIMEOUT_MS = 3000;
+
+export function billingFailureMessage(stderr: string, code: number) {
+  if (/"user" scope|-s user/.test(stderr)) {
+    return "Run `gh auth refresh -h github.com -s user` to see extra spend in dollars.";
+  }
+  const detail = stderr.trim().split("\n")[0] || `gh exited with code ${code}`;
+  return `Extra spend shown in units. Billing request failed: ${detail}`;
+}
+
 export const copilot: Adapter = {
   harness: "copilot",
   name: "GitHub Copilot",
@@ -103,12 +114,12 @@ export const copilot: Adapter = {
     }
     const user: CopilotUser = JSON.parse(res.stdout);
     if (!premiumOverage(user) || !user.login) return parseCopilot(user);
-    const billing = await exec(["gh", "api", `/users/${user.login}/settings/billing/usage/summary`]);
+    const billing = await exec(
+      ["gh", "api", `/users/${user.login}/settings/billing/usage/summary`],
+      BILLING_TIMEOUT_MS,
+    );
     if (billing.code !== 0) {
-      return {
-        ...parseCopilot(user),
-        message: "Run `gh auth refresh -h github.com -s user` to see extra spend in dollars.",
-      };
+      return { ...parseCopilot(user), message: billingFailureMessage(billing.stderr, billing.code) };
     }
     return parseCopilot(user, JSON.parse(billing.stdout));
   },
