@@ -6,6 +6,7 @@ import { snapshotPath } from "../plugins/quota-pill/hooks/snapshot.ts";
 import { parseAntigravity } from "../src/adapters/antigravity.ts";
 import { parseClaude } from "../src/adapters/claude.ts";
 import { findLatestSnapshot, parseCodex } from "../src/adapters/codex.ts";
+import { billingFailureMessage, parseCopilot } from "../src/adapters/copilot.ts";
 import { evaluateAlerts } from "../src/alerts.ts";
 import type { HarnessReport } from "../src/types.ts";
 
@@ -107,6 +108,67 @@ describe("antigravity", () => {
     });
     expect(windows).toHaveLength(1);
     expect(windows[0]).toMatchObject({ label: "All models", usedPct: 50, detail: "2 models" });
+  });
+});
+
+describe("copilot", () => {
+  const user = (premium: Record<string, unknown>) => ({
+    quota_reset_date_utc: "2026-11-01T00:00:00.000Z",
+    quota_snapshots: {
+      chat: { unlimited: true, percent_remaining: 100 },
+      premium_interactions: {
+        unlimited: false,
+        percent_remaining: 0,
+        entitlement: 7000,
+        remaining: -336,
+        ...premium,
+      },
+    },
+  });
+  const overage = { overage_permitted: true, overage_count: 335, overage_entitlement: 500 };
+  const summary = {
+    usageItems: [
+      { product: "Actions", sku: "actions_linux", netAmount: 0, pricePerUnit: 0.006 },
+      { product: "Copilot", sku: "coding_agent_ai_unit", netAmount: 0, pricePerUnit: 0.01 },
+      { product: "Copilot", sku: "copilot_ai_unit", netAmount: 3.355698134, pricePerUnit: 0.01 },
+    ],
+  };
+
+  test("shows the extra budget in dollars from the billing summary", () => {
+    const { windows } = parseCopilot(user(overage), summary);
+    expect(windows.find((w) => w.id === "extra")).toEqual({
+      id: "extra",
+      label: "Extra (month)",
+      usedPct: 67,
+      resetsAt: new Date("2026-11-01T00:00:00.000Z"),
+      detail: "$3.36/$5.00",
+    });
+  });
+
+  test("falls back to units when the billing summary is unavailable", () => {
+    const { windows } = parseCopilot(user(overage));
+    expect(windows.find((w) => w.id === "extra")?.detail).toBe("335/500");
+  });
+
+  test("omits the extra window when overage is not permitted", () => {
+    const { windows } = parseCopilot(user({ ...overage, overage_permitted: false }), summary);
+    expect(windows.map((w) => w.id)).toEqual(["premium_interactions"]);
+  });
+
+  test("suggests a scope refresh only when the user scope is missing", () => {
+    const missingScope = [
+      "gh: Not Found (HTTP 404)",
+      'gh: This API operation needs the "user" scope. To request it, run:  gh auth refresh -h github.com -s user',
+    ].join("\n");
+    expect(billingFailureMessage(missingScope, 1)).toBe(
+      "Run `gh auth refresh -h github.com -s user` to see extra spend in dollars.",
+    );
+    expect(billingFailureMessage("gh: Server Error (HTTP 502)\n", 1)).toBe(
+      "Extra spend shown in units. Billing request failed: gh: Server Error (HTTP 502)",
+    );
+    expect(billingFailureMessage("", 143)).toBe(
+      "Extra spend shown in units. Billing request failed: gh exited with code 143",
+    );
   });
 });
 

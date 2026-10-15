@@ -75,7 +75,7 @@ Only the Claude Code source is a documented interface. The others are not public
 
 | Harness | Source | Setup |
 | --- | --- | --- |
-| Copilot | `gh api /copilot_internal/user` | Install the [GitHub CLI](https://cli.github.com) and run `gh auth login`. |
+| Copilot | `gh api /copilot_internal/user`, plus the [billing usage summary](https://docs.github.com/rest/billing/usage) for extra spend | Install the [GitHub CLI](https://cli.github.com) and run `gh auth login`. When you allow spending past your plan, an "Extra" window shows how much of that budget you used. To see it in dollars, run `gh auth refresh -h github.com -s user`; without it, the window shows units. |
 | Codex | Latest `rate_limits` event in `~/.codex/sessions` (or `$CODEX_HOME`) | None. Updates only when you use Codex. Windows whose reset has passed are shown as zero. |
 | Claude Code | Plan windows recorded by the [Claude Code plugin](#claude-code-plugin) | Install the plugin. Updates only when you use Claude Code, on a Pro or Max plan. Windows whose reset has passed are shown as zero. |
 | Antigravity | `GetUserStatus` in the app's local language server | None. Works only while Antigravity is open. |
