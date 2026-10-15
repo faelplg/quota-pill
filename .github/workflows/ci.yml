@@ -22,9 +22,32 @@ jobs:
       - run: bun run typecheck
       - run: bun test
 
-  pill:
-    runs-on: macos-26
+  claude-plugin:
+    runs-on: ubuntu-latest
+    env:
+      # Pinned because mod events and methods can change between releases.
+      CLAUDE_CODE: "@anthropic-ai/claude-code@2.1.296"
     steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bunx "$CLAUDE_CODE" plugin validate .
+      - run: bunx "$CLAUDE_CODE" plugin validate plugins/quota-pill
+      - run: bunx "$CLAUDE_CODE" plugin test
+        working-directory: plugins/quota-pill
+
+  pill:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest supported system, with the oldest Xcode that has Swift 6.2.
+          - runner: macos-15
+            xcode: /Applications/Xcode_26.0.1.app
+          - runner: macos-26
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - if: matrix.xcode
+        run: sudo xcode-select -s "${{ matrix.xcode }}"
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile

@@ -26,5 +26,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  // The plugin's hooks module and tests use Claude Code's own types; see plugins/quota-pill.
+  "exclude": ["node_modules", "plugins/*/hooks/register.ts", "plugins/*/tests"]
 }

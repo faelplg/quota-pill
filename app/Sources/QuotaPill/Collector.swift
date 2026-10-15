@@ -14,7 +14,7 @@ enum CollectorError: LocalizedError {
 
 /// Runs the TypeScript collector, which stays the single source of truth for every harness.
 enum Collector {
-    // GUI apps start with a minimal PATH; the collector shells out to gh, security, claude, lsof and ps.
+    // GUI apps start with a minimal PATH; the collector shells out to gh, lsof, ps and osascript.
     private static let searchPath: [String] = {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return [

@@ -1,0 +1,4 @@
+{
+  "description": "Writes Claude Code's rate-limit windows to the Quota Pill cache",
+  "modules": ["./register.ts"]
+}

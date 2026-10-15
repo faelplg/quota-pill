@@ -1,0 +1,12 @@
+{
+  "name": "quota-pill",
+  "description": "The Claude Code plugin for Quota Pill",
+  "owner": { "name": "Quota Pill contributors" },
+  "plugins": [
+    {
+      "name": "quota-pill",
+      "source": "./plugins/quota-pill",
+      "description": "Records your Claude Code plan usage for the Quota Pill macOS app"
+    }
+  ]
+}

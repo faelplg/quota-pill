@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { snapshotPath } from "../plugins/quota-pill/hooks/snapshot.ts";
 import { parseAntigravity } from "../src/adapters/antigravity.ts";
-import { parseClaude, retryAfterMs } from "../src/adapters/claude.ts";
+import { parseClaude } from "../src/adapters/claude.ts";
 import { findLatestSnapshot, parseCodex } from "../src/adapters/codex.ts";
 import { evaluateAlerts } from "../src/alerts.ts";
 import type { HarnessReport } from "../src/types.ts";
@@ -8,26 +12,66 @@ import type { HarnessReport } from "../src/types.ts";
 const now = new Date("2026-10-10T03:00:00Z");
 
 describe("claude", () => {
-  test("resets windows whose cached reset time has passed", () => {
-    const { windows } = parseClaude(
+  test("resets windows whose recorded reset time has passed", () => {
+    const { windows, dataAsOf } = parseClaude(
       {
-        five_hour: { utilization: 77, resets_at: "2026-10-10T02:30:00Z" },
-        seven_day: { utilization: 17, resets_at: "2026-10-16T14:00:00Z" },
+        capturedAt: "2026-10-10T01:00:00.000Z",
+        rateLimits: [
+          { kind: "seven_day", percentUsed: 17, resetsAt: "2026-10-16T14:00:00Z" },
+          { kind: "five_hour", percentUsed: 77, resetsAt: "2026-10-10T02:30:00Z" },
+        ],
       },
-      "max",
       now,
     );
-    expect(windows.map((w) => [w.id, w.usedPct, w.resetsAt !== undefined])).toEqual([
-      ["five_hour", 0, false],
-      ["seven_day", 17, true],
+    expect(windows.map((w) => [w.id, w.label, w.usedPct, w.resetsAt !== undefined])).toEqual([
+      ["five_hour", "5h", 0, false],
+      ["seven_day", "Week", 17, true],
+    ]);
+    expect(dataAsOf).toEqual(new Date("2026-10-10T01:00:00Z"));
+  });
+
+  test("clamps an exceeded spend limit and keeps unknown windows last", () => {
+    const { windows } = parseClaude(
+      {
+        capturedAt: "2026-10-10T02:59:00.000Z",
+        rateLimits: [
+          { kind: "future_window", percentUsed: 5 },
+          { kind: "spend_limit", percentUsed: 112.5, resetsAt: "2026-11-01T00:00:00Z" },
+        ],
+      },
+      now,
+    );
+    expect(windows.map((w) => [w.label, w.usedPct])).toEqual([
+      ["Spend limit", 100],
+      ["future_window", 5],
     ]);
   });
 
-  test("honors retry-after in seconds or as a date, with a default backoff", () => {
-    expect(retryAfterMs("90", now)).toBe(90_000);
-    expect(retryAfterMs("Sat, 10 Oct 2026 03:02:00 GMT", now)).toBe(120_000);
-    expect(retryAfterMs(null, now)).toBe(600_000);
+  test("the collector reads the snapshot under HOME and explains an empty one", async () => {
+    const home = await mkdtemp(join(tmpdir(), "quota-pill-home-"));
+    const collect = async () => {
+      const cli = join(import.meta.dir, "..", "src", "cli.ts");
+      const child = Bun.spawn([process.execPath, cli, "--only", "claude", "--no-alerts"], {
+        // A different XDG_CACHE_HOME must not move the snapshot the plugin writes.
+        env: { ...Bun.env, HOME: home, XDG_CACHE_HOME: join(home, "elsewhere") },
+        stdout: "pipe",
+      });
+      const [report] = JSON.parse(await new Response(child.stdout).text()) as HarnessReport[];
+      return report!;
+    };
+    const write = (rateLimits: unknown[]) =>
+      Bun.write(snapshotPath(home), JSON.stringify({ capturedAt: now.toISOString(), rateLimits }));
+    try {
+      expect((await collect()).message).toStartWith("No Claude Code usage recorded yet");
+      await write([]);
+      expect((await collect()).message).toContain("only on Pro and Max plans");
+      await write([{ kind: "five_hour", percentUsed: 12 }]);
+      expect((await collect()).windows.map((w) => w.usedPct)).toEqual([12]);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
   });
+
 });
 
 describe("antigravity", () => {
