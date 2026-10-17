@@ -299,6 +299,9 @@ describe("cursor", () => {
   test("reads the IDE access token from state.vscdb", async () => {
     const home = await mkdtemp(join(tmpdir(), "quota-pill-cursor-home-"));
     const token = jwtFor("github|user_01TEST");
+    // CI often sets XDG_CONFIG_HOME; an overridden home must still win.
+    const prevXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = join(tmpdir(), "quota-pill-xdg-elsewhere");
     try {
       const dir = join(home, ".config", "Cursor", "User", "globalStorage");
       await mkdir(dir, { recursive: true });
@@ -311,6 +314,8 @@ describe("cursor", () => {
 
       expect(await readIdeAccessToken(home)).toBe(token);
     } finally {
+      if (prevXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+      else process.env.XDG_CONFIG_HOME = prevXdg;
       await rm(home, { recursive: true, force: true });
     }
   });

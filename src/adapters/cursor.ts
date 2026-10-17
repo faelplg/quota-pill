@@ -84,11 +84,17 @@ function ideStatePaths(home = homedir()): string[] {
   if (platform() === "darwin") {
     return [join(home, "Library", "Application Support", relative)];
   }
+  // When `home` is overridden (tests), ignore process env so the fake tree is used.
+  const useEnv = home === homedir();
   if (platform() === "win32") {
-    const appData = process.env.APPDATA || join(home, "AppData", "Roaming");
+    const appData = useEnv && process.env.APPDATA
+      ? process.env.APPDATA
+      : join(home, "AppData", "Roaming");
     return [join(appData, relative)];
   }
-  const xdg = process.env.XDG_CONFIG_HOME || join(home, ".config");
+  const xdg = useEnv && process.env.XDG_CONFIG_HOME
+    ? process.env.XDG_CONFIG_HOME
+    : join(home, ".config");
   return [join(xdg, relative)];
 }
 
