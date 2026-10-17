@@ -2,9 +2,10 @@ import { antigravity } from "./adapters/antigravity.ts";
 import { claude } from "./adapters/claude.ts";
 import { codex } from "./adapters/codex.ts";
 import { copilot } from "./adapters/copilot.ts";
+import { cursor } from "./adapters/cursor.ts";
 import { UnavailableError, type Adapter, type CollectOptions, type HarnessId, type HarnessReport } from "./types.ts";
 
-export const adapters: Adapter[] = [copilot, codex, claude, antigravity];
+export const adapters: Adapter[] = [copilot, codex, claude, antigravity, cursor];
 
 const TIMEOUT_MS = 12_000;
 

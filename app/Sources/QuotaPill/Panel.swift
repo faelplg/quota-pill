@@ -14,7 +14,7 @@ final class PanelState {
 final class PillPanel: NSPanel {
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 220, height: 28),
+            contentRect: NSRect(x: 0, y: 0, width: 280, height: 28),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -54,8 +54,8 @@ final class PanelController {
     private static let closeDelay = 0.3
     /// Slightly longer than the collapse animation, so it never gets clipped.
     private static let shrinkDelay = 0.26
-    private static let reservedWidth: CGFloat = 320
-    private static let reservedHeight: CGFloat = 800
+    private static let reservedWidth: CGFloat = 360
+    private static let reservedHeight: CGFloat = 1000
 
     init(store: QuotaStore) {
         self.store = store
