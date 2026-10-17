@@ -3,10 +3,18 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { snapshotPath } from "../plugins/quota-pill/hooks/snapshot.ts";
+import { Database } from "bun:sqlite";
+import { mkdir } from "node:fs/promises";
 import { parseAntigravity } from "../src/adapters/antigravity.ts";
 import { parseClaude } from "../src/adapters/claude.ts";
 import { findLatestSnapshot, parseCodex } from "../src/adapters/codex.ts";
 import { billingFailureMessage, parseCopilot } from "../src/adapters/copilot.ts";
+import {
+  normalizeAccessToken,
+  parseCursor,
+  readIdeAccessToken,
+  sessionCookie,
+} from "../src/adapters/cursor.ts";
 import { evaluateAlerts } from "../src/alerts.ts";
 import type { HarnessReport } from "../src/types.ts";
 
@@ -202,6 +210,140 @@ describe("codex", () => {
       now,
     );
     expect(windows.map((w) => [w.label, w.usedPct])).toEqual([["5h", 0], ["Week", 40]]);
+  });
+});
+
+describe("cursor", () => {
+  const jwtFor = (sub: string) => {
+    const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
+    const payload = Buffer.from(JSON.stringify({ sub, aud: "https://cursor.com", type: "session" })).toString(
+      "base64url",
+    );
+    return `${header}.${payload}.sig`;
+  };
+
+  test("maps plan and on-demand remaining into two windows", () => {
+    const { windows, plan } = parseCursor({
+      billingCycleEnd: "2026-11-01T00:00:00.000Z",
+      membershipType: "pro",
+      individualUsage: {
+        plan: {
+          enabled: true,
+          used: 150,
+          limit: 500,
+          remaining: 350,
+          totalPercentUsed: 30,
+        },
+        onDemand: {
+          enabled: true,
+          used: 2309,
+          limit: 5000,
+          remaining: 2691,
+        },
+      },
+    });
+    expect(plan).toBe("Pro");
+    expect(windows).toHaveLength(2);
+    expect(windows[0]).toEqual({
+      id: "plan",
+      label: "Plan",
+      usedPct: 30,
+      resetsAt: new Date("2026-11-01T00:00:00.000Z"),
+      detail: "350/500",
+    });
+    expect(windows[1]).toMatchObject({
+      id: "extra",
+      label: "Extra",
+      resetsAt: new Date("2026-11-01T00:00:00.000Z"),
+      detail: "$26.91/$50.00",
+    });
+    expect(windows[1]!.usedPct).toBeCloseTo(46.18, 2);
+  });
+
+  test("falls back to team on-demand when individual has no limit", () => {
+    const { windows } = parseCursor({
+      membershipType: "enterprise",
+      individualUsage: {
+        plan: { enabled: true, used: 100, limit: 100, remaining: 0, totalPercentUsed: 100 },
+        onDemand: { enabled: true, used: 10, limit: null, remaining: null },
+      },
+      teamUsage: {
+        onDemand: { enabled: true, used: 1000, limit: 4000, remaining: 3000 },
+      },
+    });
+    expect(windows.map((w) => [w.id, w.detail, Math.round(w.usedPct)])).toEqual([
+      ["plan", "0/100", 100],
+      ["extra", "$30.00/$40.00", 25],
+    ]);
+  });
+
+  test("omits windows when the plan is unlimited", () => {
+    const report = parseCursor({ isUnlimited: true, membershipType: "ultra" });
+    expect(report).toMatchObject({ plan: "Ultra", windows: [], message: "Unlimited plan." });
+  });
+
+  test("builds the WorkosCursorSessionToken cookie from the JWT sub", () => {
+    const token = jwtFor("auth0|user_01ABC");
+    expect(sessionCookie(token)).toBe(
+      `WorkosCursorSessionToken=${encodeURIComponent(`auth0|user_01ABC::${token}`)}`,
+    );
+  });
+
+  test("normalizes a UTF-16LE access token blob", () => {
+    const token = jwtFor("user_01XYZ");
+    const utf16 = Buffer.from(token, "utf16le");
+    expect(normalizeAccessToken(utf16)).toBe(token);
+    expect(normalizeAccessToken(Buffer.from(token, "utf8").toString("utf8"))).toBe(token);
+  });
+
+  test("reads the IDE access token from state.vscdb", async () => {
+    const home = await mkdtemp(join(tmpdir(), "quota-pill-cursor-home-"));
+    const token = jwtFor("github|user_01TEST");
+    // CI often sets XDG_CONFIG_HOME; an overridden home must still win.
+    const prevXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = join(tmpdir(), "quota-pill-xdg-elsewhere");
+    try {
+      const dir = join(home, ".config", "Cursor", "User", "globalStorage");
+      await mkdir(dir, { recursive: true });
+      const dbPath = join(dir, "state.vscdb");
+      {
+        using db = new Database(dbPath);
+        db.run("CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value BLOB)");
+        db.run("INSERT INTO ItemTable (key, value) VALUES (?, ?)", ["cursorAuth/accessToken", token]);
+      }
+
+      expect(await readIdeAccessToken(home)).toBe(token);
+    } finally {
+      if (prevXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+      else process.env.XDG_CONFIG_HOME = prevXdg;
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test("the collector fails soft when no Cursor session exists", async () => {
+    const home = await mkdtemp(join(tmpdir(), "quota-pill-cursor-empty-"));
+    try {
+      const cli = join(import.meta.dir, "..", "src", "cli.ts");
+      const child = Bun.spawn([process.execPath, cli, "--only", "cursor", "--no-alerts"], {
+        env: {
+          ...Bun.env,
+          HOME: home,
+          XDG_CONFIG_HOME: join(home, "xdg-config"),
+          APPDATA: join(home, "appdata"),
+        },
+        stdout: "pipe",
+      });
+      const [report] = JSON.parse(await new Response(child.stdout).text()) as HarnessReport[];
+      expect(report).toMatchObject({
+        harness: "cursor",
+        short: "CU",
+        status: "unavailable",
+        windows: [],
+      });
+      expect(report!.message).toContain("No Cursor session found");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
   });
 });
 

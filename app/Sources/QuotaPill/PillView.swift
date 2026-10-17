@@ -5,6 +5,7 @@ private let links: [String: URL] = [
     "copilot": URL(string: "https://github.com/settings/billing/premium_requests_usage")!,
     "codex": URL(string: "https://chatgpt.com/codex/settings/usage")!,
     "claude": URL(string: "https://claude.ai/settings/usage")!,
+    "cursor": URL(string: "https://cursor.com/dashboard?tab=usage")!,
 ]
 
 private let cardRadius: CGFloat = 14
