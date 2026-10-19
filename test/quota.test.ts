@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { snapshotPath } from "../plugins/quota-pill/hooks/snapshot.ts";
 import { Database } from "bun:sqlite";
@@ -299,11 +299,16 @@ describe("cursor", () => {
   test("reads the IDE access token from state.vscdb", async () => {
     const home = await mkdtemp(join(tmpdir(), "quota-pill-cursor-home-"));
     const token = jwtFor("github|user_01TEST");
-    // CI often sets XDG_CONFIG_HOME; an overridden home must still win.
+    // CI often sets XDG_CONFIG_HOME; an overridden home must still win on Linux.
     const prevXdg = process.env.XDG_CONFIG_HOME;
     process.env.XDG_CONFIG_HOME = join(tmpdir(), "quota-pill-xdg-elsewhere");
     try {
-      const dir = join(home, ".config", "Cursor", "User", "globalStorage");
+      // Match ideStatePaths: Darwin → Application Support; else → home/.config
+      // (XDG_CONFIG_HOME is ignored when `home` is overridden).
+      const dir =
+        platform() === "darwin"
+          ? join(home, "Library", "Application Support", "Cursor", "User", "globalStorage")
+          : join(home, ".config", "Cursor", "User", "globalStorage");
       await mkdir(dir, { recursive: true });
       const dbPath = join(dir, "state.vscdb");
       {
