@@ -283,9 +283,17 @@ describe("cursor", () => {
   });
 
   test("builds the WorkosCursorSessionToken cookie from the JWT sub", () => {
-    const token = jwtFor("auth0|user_01ABC");
-    expect(sessionCookie(token)).toBe(
-      `WorkosCursorSessionToken=${encodeURIComponent(`auth0|user_01ABC::${token}`)}`,
+    const prefixed = jwtFor("auth0|user_01ABC");
+    expect(sessionCookie(prefixed)).toBe(
+      `WorkosCursorSessionToken=${encodeURIComponent(`user_01ABC::${prefixed}`)}`,
+    );
+    const bare = jwtFor("user_01DEF");
+    expect(sessionCookie(bare)).toBe(
+      `WorkosCursorSessionToken=${encodeURIComponent(`user_01DEF::${bare}`)}`,
+    );
+    const nested = jwtFor("github|auth0|user_01GHI");
+    expect(sessionCookie(nested)).toBe(
+      `WorkosCursorSessionToken=${encodeURIComponent(`user_01GHI::${nested}`)}`,
     );
   });
 

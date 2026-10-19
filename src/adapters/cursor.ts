@@ -48,13 +48,19 @@ const PLANS: Record<string, string> = {
 
 const usdFromCents = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
+/** Cookie user id is the JWT `sub`, or the segment after the final `|` when provider-qualified. */
+export function cookieUserIdFromSub(sub: string): string | undefined {
+  const id = sub.includes("|") ? sub.slice(sub.lastIndexOf("|") + 1) : sub;
+  return id.length > 0 ? id : undefined;
+}
+
 function decodeJwtSub(token: string): string | undefined {
   const payload = token.split(".")[1];
   if (!payload) return undefined;
   try {
     const json = Buffer.from(payload, "base64url").toString("utf8");
     const sub = (JSON.parse(json) as { sub?: string }).sub;
-    return typeof sub === "string" && sub.length > 0 ? sub : undefined;
+    return typeof sub === "string" && sub.length > 0 ? cookieUserIdFromSub(sub) : undefined;
   } catch {
     return undefined;
   }
