@@ -1,4 +1,4 @@
-export type HarnessId = "copilot" | "codex" | "claude" | "antigravity";
+export type HarnessId = "copilot" | "codex" | "claude" | "antigravity" | "cursor";
 
 export interface QuotaWindow {
   id: string;

@@ -1,9 +1,9 @@
 # Quota Pill
 
-A floating macOS pill that shows how much of your GitHub Copilot, Codex, Claude Code, and Antigravity quotas you have used.
+A floating macOS pill that shows how much of your GitHub Copilot, Codex, Claude Code, Antigravity, and Cursor quotas you have used.
 
 ```
-CP 47  CX 6  CC 69  AG 0
+CP 47  CX 6  CC 69  AG 0  CU 12
 ```
 
 Each number is the fullest window for that harness, in %. `–` means the source is currently unavailable, and `!` means an error occurred. Numbers are blue, turn orange at 80%, and red at 95%. When a threshold is crossed, macOS shows one notification per threshold in each reset cycle.
@@ -79,12 +79,13 @@ Only the Claude Code source is a documented interface. The others are not public
 | Codex | Latest `rate_limits` event in `~/.codex/sessions` (or `$CODEX_HOME`) | None. Updates only when you use Codex. Windows whose reset has passed are shown as zero. |
 | Claude Code | Plan windows recorded by the [Claude Code plugin](#claude-code-plugin) | Install the plugin. Updates only when you use Claude Code, on a Pro or Max plan. Windows whose reset has passed are shown as zero. |
 | Antigravity | `GetUserStatus` in the app's local language server | None. Works only while Antigravity is open. |
+| Cursor | `GET https://cursor.com/api/usage-summary` with the IDE session cookie | Sign in to the Cursor IDE (reads `state.vscdb`), or fall back to `cursor-agent` / `agent` login credentials. Shows plan quota remaining and extra/on-demand budget remaining. |
 
 ## Privacy
 
 Quota Pill has no server and no telemetry, and it never reads or stores credentials itself.
 
-- The only network requests go to GitHub, through `gh` and its own login, and to Antigravity's language server on `127.0.0.1`. Codex and Claude Code are read from local files.
+- The only network requests go to GitHub, through `gh` and its own login; to Cursor's usage-summary endpoint, using the session already stored by the Cursor IDE or `cursor-agent` CLI; and to Antigravity's language server on `127.0.0.1`. Codex and Claude Code are read from local files.
 - Alert state and other caches are kept in `~/Library/Caches/quota-pill/` (or `$XDG_CACHE_HOME/quota-pill/`). The Claude Code snapshot always stays in `~/Library/Caches/quota-pill/`, because Claude Code and the pill's LaunchAgent do not share environment variables.
 
 ## Troubleshooting
@@ -124,7 +125,7 @@ Issues and pull requests are welcome. Run `bun test` and `bun run typecheck` bef
 
 ## Disclaimer
 
-Quota Pill is an independent project and is not affiliated with or endorsed by GitHub, OpenAI, Anthropic, or Google. Product names belong to their owners.
+Quota Pill is an independent project and is not affiliated with or endorsed by GitHub, OpenAI, Anthropic, Google, or Cursor. Product names belong to their owners.
 
 ## License
 
