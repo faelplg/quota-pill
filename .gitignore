@@ -39,3 +39,6 @@ app/.build
 # Claude Code plugin: types and tsconfig written by `claude --plugin-dir`
 plugins/*/.claude-plugin/types/
 plugins/*/tsconfig.json
+
+# Radiant: relatórios de manutenção
+.radiant/

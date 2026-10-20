@@ -1,0 +1,14 @@
+{
+  "radiant_revision": "a8428040709656ad23f27a9d6639f6c0dec8a94f",
+  "frame": null,
+  "spec": null,
+  "plan": null,
+  "workflow": null,
+  "engineering_profile": null,
+  "contracts": null,
+  "active_contract": null,
+  "adrs": null,
+  "verification": null,
+  "learning": null,
+  "maintenance": ".radiant/maintenance"
+}
