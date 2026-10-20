@@ -46,6 +46,11 @@ export interface CurrentPeriodUsage {
   billingCycleEnd?: string;
   enabled?: boolean;
   planUsage?: {
+    /** Cents; when present, the dashboard's included meter is includedSpend / limit. */
+    includedSpend?: number;
+    limit?: number;
+    remaining?: number;
+    /** A weighted model metric that can diverge from the included meter. */
     totalPercentUsed?: number;
     autoPercentUsed?: number;
     apiPercentUsed?: number;
@@ -207,8 +212,12 @@ function epochMs(value: string | undefined): Date | undefined {
 }
 
 function periodWindow(period: CurrentPeriodUsage): QuotaWindow | undefined {
-  const usedPct = period.planUsage?.totalPercentUsed;
-  if (!period.enabled || usedPct === undefined) return undefined;
+  const usage = period.planUsage;
+  if (!period.enabled || !usage) return undefined;
+  const { includedSpend: spent, limit } = usage;
+  const fromSpend = spent !== undefined && limit !== undefined && limit > 0;
+  const usedPct = fromSpend ? (spent / limit) * 100 : usage.totalPercentUsed;
+  if (usedPct === undefined) return undefined;
   const start = epochMs(period.billingCycleStart);
   const end = epochMs(period.billingCycleEnd);
   const days = start && end ? Math.round((end.getTime() - start.getTime()) / DAY_MS) : undefined;
@@ -217,6 +226,9 @@ function periodWindow(period: CurrentPeriodUsage): QuotaWindow | undefined {
     label: days === 7 ? "Week" : "Plan",
     usedPct: clampPct(usedPct),
     resetsAt: end,
+    detail: fromSpend
+      ? `${usdFromCents(usage.remaining ?? Math.max(0, limit - spent))}/${usdFromCents(limit)}`
+      : undefined,
   };
 }
 
@@ -328,6 +340,15 @@ export function fetchCurrentPeriodUsage(cookie: string): Promise<CurrentPeriodUs
   });
 }
 
+/** The summary alone still yields a report, so a failing period request only drops its window. */
+export async function collectCursor(cookie: string) {
+  const [summary, period] = await Promise.all([
+    fetchUsageSummary(cookie),
+    fetchCurrentPeriodUsage(cookie).catch((): CurrentPeriodUsage => ({})),
+  ]);
+  return parseCursor({ summary, period });
+}
+
 export const cursor: Adapter = {
   harness: "cursor",
   name: "Cursor",
@@ -337,7 +358,6 @@ export const cursor: Adapter = {
     if (!token) throw new UnavailableError(NO_SESSION);
     const cookie = sessionCookie(token);
     if (!cookie) throw new UnavailableError(NO_SESSION);
-    const [summary, period] = await Promise.all([fetchUsageSummary(cookie), fetchCurrentPeriodUsage(cookie)]);
-    return parseCursor({ summary, period });
+    return collectCursor(cookie);
   },
 };

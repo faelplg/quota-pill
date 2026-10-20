@@ -11,6 +11,7 @@ import { findLatestSnapshot, parseCodex } from "../src/adapters/codex.ts";
 import { billingFailureMessage, parseCopilot } from "../src/adapters/copilot.ts";
 import {
   normalizeAccessToken,
+  collectCursor,
   parseCursor,
   readIdeAccessToken,
   sessionCookie,
@@ -324,6 +325,48 @@ describe("cursor", () => {
       ["plan", "$0.00/$1.00", 100],
       ["extra", "$30.00/$40.00", 25],
     ]);
+  });
+
+  test("prefers included spend over the weighted model percentage", () => {
+    const { windows } = parseCursor({
+      summary: {},
+      period: {
+        billingCycleEnd: "1792869250278",
+        enabled: true,
+        planUsage: { includedSpend: 1516, limit: 2000, remaining: 484, totalPercentUsed: 3.06 },
+      },
+    });
+    expect(windows).toEqual([
+      {
+        id: "plan",
+        label: "Plan",
+        usedPct: 75.8,
+        resetsAt: new Date("2026-10-24T19:14:10.278Z"),
+        detail: "$4.84/$20.00",
+      },
+    ]);
+  });
+
+  test("keeps the summary when the current-period request fails", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.endsWith("/api/usage-summary")) {
+        return Response.json({
+          membershipType: "pro",
+          individualUsage: {
+            plan: { enabled: true, used: 600, limit: 2000, remaining: 1400, totalPercentUsed: 30 },
+          },
+        });
+      }
+      return new Response("bad request", { status: 400 });
+    }) as typeof fetch;
+    try {
+      const report = await collectCursor("WorkosCursorSessionToken=x");
+      expect(report.windows.map((w) => [w.id, w.usedPct, w.detail])).toEqual([["plan", 30, "$14.00/$20.00"]]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 
   test("omits windows when the plan is unlimited", () => {
