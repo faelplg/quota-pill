@@ -4,7 +4,8 @@
 Este projeto usa Radiant. Localize seu checkout pelo bootstrap global do usuário
 e leia nele o README do adapter do harness em uso, em `adapters/<harness>/`,
 para validar a revisão e carregar o Core. Se o pointer estiver ausente,
-configure-o antes de executar sob Radiant. Em harnesses que leem outro arquivo
+configure-o antes de executar sob Radiant. Quem não usa o Radiant segue só
+os comandos e as regras locais abaixo. Em harnesses que leem outro arquivo
 de instruções, esse arquivo contém apenas um import deste mapa; no Claude Code,
 `CLAUDE.md` com a linha `@AGENTS.md`.
 
