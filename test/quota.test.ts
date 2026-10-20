@@ -11,6 +11,7 @@ import { findLatestSnapshot, parseCodex } from "../src/adapters/codex.ts";
 import { billingFailureMessage, parseCopilot } from "../src/adapters/copilot.ts";
 import {
   normalizeAccessToken,
+  collectCursor,
   parseCursor,
   readIdeAccessToken,
   sessionCookie,
@@ -222,24 +223,50 @@ describe("cursor", () => {
     return `${header}.${payload}.sig`;
   };
 
-  test("maps plan and on-demand remaining into two windows", () => {
+  test("reads the plan from the current period, which may be weekly", () => {
     const { windows, plan } = parseCursor({
-      billingCycleEnd: "2026-11-01T00:00:00.000Z",
-      membershipType: "pro",
-      individualUsage: {
-        plan: {
-          enabled: true,
-          used: 150,
-          limit: 500,
-          remaining: 350,
-          totalPercentUsed: 30,
+      summary: {
+        billingCycleEnd: "2026-11-01T00:00:00.000Z",
+        membershipType: "premium",
+        individualUsage: {
+          // Calendar-month snapshot that lags behind the weekly included usage.
+          plan: { enabled: true, used: 0, limit: 4615, remaining: 4615, totalPercentUsed: 0 },
+          onDemand: { enabled: false, used: 0, limit: null, remaining: null },
         },
-        onDemand: {
-          enabled: true,
-          used: 2309,
-          limit: 5000,
-          remaining: 2691,
+      },
+      period: {
+        billingCycleStart: "1792264450278",
+        billingCycleEnd: "1792869250278",
+        enabled: true,
+        planUsage: { autoPercentUsed: 15.9, apiPercentUsed: 0, totalPercentUsed: 15.9 },
+      },
+    });
+    expect(plan).toBe("Premium");
+    expect(windows).toEqual([
+      {
+        id: "plan",
+        label: "Week",
+        usedPct: 15.9,
+        resetsAt: new Date("2026-10-24T19:14:10.278Z"),
+      },
+    ]);
+  });
+
+  test("labels a monthly current period as Plan and keeps on-demand remaining", () => {
+    const { windows, plan } = parseCursor({
+      summary: {
+        billingCycleEnd: "2026-11-01T00:00:00.000Z",
+        membershipType: "pro",
+        individualUsage: {
+          plan: { enabled: true, used: 600, limit: 2000, remaining: 1400, totalPercentUsed: 30 },
+          onDemand: { enabled: true, used: 2309, limit: 5000, remaining: 2691 },
         },
+      },
+      period: {
+        billingCycleStart: String(Date.parse("2026-10-01T00:00:00.000Z")),
+        billingCycleEnd: String(Date.parse("2026-11-01T00:00:00.000Z")),
+        enabled: true,
+        planUsage: { totalPercentUsed: 30 },
       },
     });
     expect(plan).toBe("Pro");
@@ -249,7 +276,6 @@ describe("cursor", () => {
       label: "Plan",
       usedPct: 30,
       resetsAt: new Date("2026-11-01T00:00:00.000Z"),
-      detail: "350/500",
     });
     expect(windows[1]).toMatchObject({
       id: "extra",
@@ -260,25 +286,91 @@ describe("cursor", () => {
     expect(windows[1]!.usedPct).toBeCloseTo(46.18, 2);
   });
 
+  test("falls back to the summary plan, in dollars, when the period has no usage", () => {
+    const { windows } = parseCursor({
+      summary: {
+        billingCycleEnd: "2026-11-01T00:00:00.000Z",
+        individualUsage: {
+          plan: { enabled: true, used: 600, limit: 2000, remaining: 1400, totalPercentUsed: 30 },
+        },
+      },
+      period: { enabled: false },
+    });
+    expect(windows).toEqual([
+      {
+        id: "plan",
+        label: "Plan",
+        usedPct: 30,
+        resetsAt: new Date("2026-11-01T00:00:00.000Z"),
+        detail: "$14.00/$20.00",
+      },
+    ]);
+  });
+
   test("falls back to team on-demand when individual has no limit", () => {
     const { windows } = parseCursor({
-      membershipType: "enterprise",
-      individualUsage: {
-        plan: { enabled: true, used: 100, limit: 100, remaining: 0, totalPercentUsed: 100 },
-        onDemand: { enabled: true, used: 10, limit: null, remaining: null },
+      summary: {
+        membershipType: "enterprise",
+        individualUsage: {
+          plan: { enabled: true, used: 100, limit: 100, remaining: 0, totalPercentUsed: 100 },
+          onDemand: { enabled: true, used: 10, limit: null, remaining: null },
+        },
+        teamUsage: {
+          onDemand: { enabled: true, used: 1000, limit: 4000, remaining: 3000 },
+        },
       },
-      teamUsage: {
-        onDemand: { enabled: true, used: 1000, limit: 4000, remaining: 3000 },
-      },
+      period: {},
     });
     expect(windows.map((w) => [w.id, w.detail, Math.round(w.usedPct)])).toEqual([
-      ["plan", "0/100", 100],
+      ["plan", "$0.00/$1.00", 100],
       ["extra", "$30.00/$40.00", 25],
     ]);
   });
 
+  test("prefers included spend over the weighted model percentage", () => {
+    const { windows } = parseCursor({
+      summary: {},
+      period: {
+        billingCycleEnd: "1792869250278",
+        enabled: true,
+        planUsage: { includedSpend: 1516, limit: 2000, remaining: 484, totalPercentUsed: 3.06 },
+      },
+    });
+    expect(windows).toEqual([
+      {
+        id: "plan",
+        label: "Plan",
+        usedPct: 75.8,
+        resetsAt: new Date("2026-10-24T19:14:10.278Z"),
+        detail: "$4.84/$20.00",
+      },
+    ]);
+  });
+
+  test("keeps the summary when the current-period request fails", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.endsWith("/api/usage-summary")) {
+        return Response.json({
+          membershipType: "pro",
+          individualUsage: {
+            plan: { enabled: true, used: 600, limit: 2000, remaining: 1400, totalPercentUsed: 30 },
+          },
+        });
+      }
+      return new Response("bad request", { status: 400 });
+    }) as typeof fetch;
+    try {
+      const report = await collectCursor("WorkosCursorSessionToken=x");
+      expect(report.windows.map((w) => [w.id, w.usedPct, w.detail])).toEqual([["plan", 30, "$14.00/$20.00"]]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   test("omits windows when the plan is unlimited", () => {
-    const report = parseCursor({ isUnlimited: true, membershipType: "ultra" });
+    const report = parseCursor({ summary: { isUnlimited: true, membershipType: "ultra" }, period: {} });
     expect(report).toMatchObject({ plan: "Ultra", windows: [], message: "Unlimited plan." });
   });
 
