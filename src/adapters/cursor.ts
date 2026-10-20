@@ -6,6 +6,8 @@ import { exec } from "../exec.ts";
 import { clampPct, UnavailableError, type Adapter, type QuotaWindow } from "../types.ts";
 
 const USAGE_SUMMARY_URL = "https://cursor.com/api/usage-summary";
+const CURRENT_PERIOD_URL = "https://cursor.com/api/dashboard/get-current-period-usage";
+const ORIGIN = "https://cursor.com";
 const AUTH_KEY = "cursorAuth/accessToken";
 const NO_SESSION =
   "No Cursor session found. Sign in to the Cursor IDE, or run `agent login` / `cursor-agent login`.";
@@ -31,6 +33,22 @@ export interface UsageSummary {
   };
   teamUsage?: {
     onDemand?: UsageBucket;
+  };
+}
+
+/**
+ * The included-usage period, which plans like Premium reset weekly. Unlike the
+ * summary's calendar-month cycle, its percentages track what the dashboard shows.
+ */
+export interface CurrentPeriodUsage {
+  /** Epoch milliseconds, as a string. */
+  billingCycleStart?: string;
+  billingCycleEnd?: string;
+  enabled?: boolean;
+  planUsage?: {
+    totalPercentUsed?: number;
+    autoPercentUsed?: number;
+    apiPercentUsed?: number;
   };
 }
 
@@ -181,6 +199,27 @@ export async function resolveAccessToken(home = homedir()): Promise<string | und
   return (await readIdeAccessToken(home)) ?? (await readCliAccessToken());
 }
 
+const DAY_MS = 86_400_000;
+
+function epochMs(value: string | undefined): Date | undefined {
+  const ms = Number(value);
+  return value && Number.isFinite(ms) && ms > 0 ? new Date(ms) : undefined;
+}
+
+function periodWindow(period: CurrentPeriodUsage): QuotaWindow | undefined {
+  const usedPct = period.planUsage?.totalPercentUsed;
+  if (!period.enabled || usedPct === undefined) return undefined;
+  const start = epochMs(period.billingCycleStart);
+  const end = epochMs(period.billingCycleEnd);
+  const days = start && end ? Math.round((end.getTime() - start.getTime()) / DAY_MS) : undefined;
+  return {
+    id: "plan",
+    label: days === 7 ? "Week" : "Plan",
+    usedPct: clampPct(usedPct),
+    resetsAt: end,
+  };
+}
+
 function planWindow(plan: UsageBucket | undefined, resetsAt: Date | undefined): QuotaWindow | undefined {
   if (!plan?.enabled) return undefined;
   const limit = plan.limit;
@@ -209,72 +248,43 @@ function planWindow(plan: UsageBucket | undefined, resetsAt: Date | undefined): 
     label: "Plan",
     usedPct,
     resetsAt,
-    detail: left !== undefined ? `${Math.round(left)}/${Math.round(limit)}` : undefined,
+    detail: left !== undefined ? `${usdFromCents(left)}/${usdFromCents(limit)}` : undefined,
   };
 }
 
-function onDemandWindow(
-  bucket: UsageBucket | undefined,
-  id: string,
-  label: string,
-  resetsAt: Date | undefined,
-  asCents: boolean,
-): QuotaWindow | undefined {
+function onDemandWindow(bucket: UsageBucket | undefined, resetsAt: Date | undefined): QuotaWindow | undefined {
   if (!bucket?.enabled) return undefined;
   const limit = bucket.limit;
   if (limit == null || limit <= 0) return undefined;
   const used = bucket.used ?? 0;
   const remaining = bucket.remaining ?? Math.max(0, limit - used);
-  const fmt = asCents
-    ? (n: number) => usdFromCents(n)
-    : (n: number) => String(Math.round(n));
   return {
-    id,
-    label,
+    id: "extra",
+    label: "Extra",
     usedPct: clampPct((used / limit) * 100),
     resetsAt,
-    detail: `${fmt(remaining)}/${fmt(limit)}`,
+    detail: `${usdFromCents(remaining)}/${usdFromCents(limit)}`,
   };
 }
 
-export function parseCursor(summary: UsageSummary) {
+/** Amounts in the summary are cents. */
+export function parseCursor({ summary, period }: { summary: UsageSummary; period: CurrentPeriodUsage }) {
+  const planName = summary.membershipType
+    ? PLANS[summary.membershipType] ?? titleCase(summary.membershipType)
+    : undefined;
   if (summary.isUnlimited) {
-    return {
-      status: "ok" as const,
-      plan: summary.membershipType ? PLANS[summary.membershipType] ?? titleCase(summary.membershipType) : undefined,
-      windows: [] as QuotaWindow[],
-      message: "Unlimited plan.",
-    };
+    return { status: "ok" as const, plan: planName, windows: [] as QuotaWindow[], message: "Unlimited plan." };
   }
 
   const resetsAt = summary.billingCycleEnd ? new Date(summary.billingCycleEnd) : undefined;
   const windows: QuotaWindow[] = [];
-  const plan = planWindow(summary.individualUsage?.plan, resetsAt);
+  const plan = periodWindow(period) ?? planWindow(summary.individualUsage?.plan, resetsAt);
   if (plan) windows.push(plan);
 
-  const individualExtra = onDemandWindow(
-    summary.individualUsage?.onDemand,
-    "extra",
-    "Extra",
-    resetsAt,
-    true,
-  );
-  if (individualExtra) {
-    windows.push(individualExtra);
-  } else {
-    const teamExtra = onDemandWindow(
-      summary.teamUsage?.onDemand,
-      "extra",
-      "Extra",
-      resetsAt,
-      true,
-    );
-    if (teamExtra) windows.push(teamExtra);
-  }
+  const extra = onDemandWindow(summary.individualUsage?.onDemand, resetsAt)
+    ?? onDemandWindow(summary.teamUsage?.onDemand, resetsAt);
+  if (extra) windows.push(extra);
 
-  const planName = summary.membershipType
-    ? PLANS[summary.membershipType] ?? titleCase(summary.membershipType)
-    : undefined;
   return { status: "ok" as const, plan: planName, windows };
 }
 
@@ -286,12 +296,10 @@ function titleCase(value: string): string {
     .join(" ");
 }
 
-export async function fetchUsageSummary(cookie: string): Promise<UsageSummary> {
-  const res = await fetch(USAGE_SUMMARY_URL, {
-    headers: {
-      Cookie: cookie,
-      Accept: "application/json",
-    },
+async function fetchCursor<T>(url: string, cookie: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: { Cookie: cookie, Accept: "application/json", ...init.headers },
     redirect: "manual",
     signal: AbortSignal.timeout(8000),
   });
@@ -302,9 +310,22 @@ export async function fetchUsageSummary(cookie: string): Promise<UsageSummary> {
     throw new UnavailableError("Cursor session was rejected. Sign in to the Cursor IDE again.");
   }
   if (!res.ok) {
-    throw new Error(`Cursor usage-summary returned HTTP ${res.status}.`);
+    throw new Error(`Cursor ${new URL(url).pathname} returned HTTP ${res.status}.`);
   }
-  return (await res.json()) as UsageSummary;
+  return (await res.json()) as T;
+}
+
+export function fetchUsageSummary(cookie: string): Promise<UsageSummary> {
+  return fetchCursor(USAGE_SUMMARY_URL, cookie);
+}
+
+/** A dashboard endpoint: it answers 403 without a same-site Origin. */
+export function fetchCurrentPeriodUsage(cookie: string): Promise<CurrentPeriodUsage> {
+  return fetchCursor(CURRENT_PERIOD_URL, cookie, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: ORIGIN },
+    body: "{}",
+  });
 }
 
 export const cursor: Adapter = {
@@ -316,6 +337,7 @@ export const cursor: Adapter = {
     if (!token) throw new UnavailableError(NO_SESSION);
     const cookie = sessionCookie(token);
     if (!cookie) throw new UnavailableError(NO_SESSION);
-    return parseCursor(await fetchUsageSummary(cookie));
+    const [summary, period] = await Promise.all([fetchUsageSummary(cookie), fetchCurrentPeriodUsage(cookie)]);
+    return parseCursor({ summary, period });
   },
 };
