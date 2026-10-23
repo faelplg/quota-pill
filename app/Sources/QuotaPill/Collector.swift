@@ -199,8 +199,10 @@ private final class Execution: Sendable {
         let group = -process.processIdentifier
         guard stoppingGroup, group < 0 else { return }
         kill(group, SIGTERM)
-        after(Self.killGrace) { [self] in
-            if process.isRunning { kill(group, SIGKILL) }
+        // The group outlives the collector while any descendant remains, and its id cannot be
+        // reused until it is empty, so escalate only while it still exists.
+        after(Self.killGrace) {
+            if kill(group, 0) == 0 { kill(group, SIGKILL) }
         }
     }
 

@@ -67,4 +67,17 @@ struct CollectorRunTests {
         try await Task.sleep(for: .milliseconds(500))
         #expect(!isAlive(pid))
     }
+
+    @Test func killsAGrandchildThatIgnoresSIGTERMAfterTheCollectorExits() async throws {
+        let file = temporaryFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let output = try await run("sh -c \"trap '' TERM; echo \\$\\$ > '\(file.path)'; exec sleep 600\" & echo ok")
+        #expect(output == "ok\n")
+        let pid = try pid(in: file)
+        defer { kill(pid, SIGKILL) }
+        // SIGTERM went out when the run finished; SIGKILL follows after the kill grace.
+        #expect(isAlive(pid))
+        try await Task.sleep(for: .seconds(4))
+        #expect(!isAlive(pid))
+    }
 }
