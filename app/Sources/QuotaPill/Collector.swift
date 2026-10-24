@@ -137,8 +137,8 @@ private final class Execution: Sendable {
             process.terminationHandler = nil
             state.withLock { $0.exited = true }
             finishIfDone()
-            // A pipe still open here is held by a leftover grandchild, which the group signal stops.
-            after(Self.drainGrace) { self.finish(stoppingGroup: true) }
+            // A pipe still open here is held by a leftover descendant, which the group cleanup stops.
+            after(Self.drainGrace) { self.finish() }
         }
         do {
             try process.run()
@@ -163,13 +163,13 @@ private final class Execution: Sendable {
     }
 
     private func finishIfDone() {
-        if state.withLock({ $0.exited && $0.openStreams == 0 }) { finish(stoppingGroup: false) }
+        if state.withLock({ $0.exited && $0.openStreams == 0 }) { finish() }
     }
 
     /// Resumes with the process result. Called once the collector has exited.
-    private func finish(stoppingGroup: Bool) {
+    private func finish() {
         let status = process.terminationStatus
-        complete(stoppingGroup: stoppingGroup) { state in
+        complete { state in
             if status == 0 { return .success(state.output) }
             let message = String(decoding: state.errors, as: UTF8.self)
                 .split(separator: "\n").first.map(String.init)
@@ -179,13 +179,13 @@ private final class Execution: Sendable {
     }
 
     private func finish(throwing error: any Error) {
-        complete(stoppingGroup: process.isRunning) { _ in .failure(error) }
+        complete { _ in .failure(error) }
     }
 
-    /// Resumes the continuation if nobody has yet, stops reading the pipes and, when asked,
-    /// stops the collector and anything it spawned. The process leads its own process group.
-    /// The pipes close when this object goes away, never under a reader that may still be running.
-    private func complete(stoppingGroup: Bool, _ result: (State) -> Result<Data, any Error>) {
+    /// Resumes the continuation if nobody has yet, stops reading the pipes and stops whatever
+    /// is left of the collector. The pipes close when this object goes away, never under a
+    /// reader that may still be running.
+    private func complete(_ result: (State) -> Result<Data, any Error>) {
         let resumed: (CheckedContinuation<Data, any Error>, Result<Data, any Error>)? = state.withLock { state in
             guard let continuation = state.continuation else { return nil }
             state.continuation = nil
@@ -196,11 +196,17 @@ private final class Execution: Sendable {
 
         stdout.fileHandleForReading.readabilityHandler = nil
         stderr.fileHandleForReading.readabilityHandler = nil
+        stopGroup()
+    }
+
+    /// Signals the collector's process group, which it leads, whenever the group still exists,
+    /// whether the collector itself has exited or not. The group outlives the collector while any
+    /// descendant remains, and its id cannot be reused until it is empty.
+    private func stopGroup() {
+        guard process.processIdentifier > 0 else { return }
         let group = -process.processIdentifier
-        guard stoppingGroup, group < 0 else { return }
+        guard kill(group, 0) == 0 else { return }
         kill(group, SIGTERM)
-        // The group outlives the collector while any descendant remains, and its id cannot be
-        // reused until it is empty, so escalate only while it still exists.
         after(Self.killGrace) {
             if kill(group, 0) == 0 { kill(group, SIGKILL) }
         }

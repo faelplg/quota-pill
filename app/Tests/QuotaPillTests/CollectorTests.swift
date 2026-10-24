@@ -68,6 +68,22 @@ struct CollectorRunTests {
         #expect(!isAlive(pid))
     }
 
+    @Test func stopsADescendantWhenTheTimeoutFollowsTheCollectorExit() async throws {
+        let file = temporaryFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        // The collector exits after 0.5s, so the 1s timeout fires inside the drain grace.
+        do {
+            _ = try await run("sleep 600 & echo $! > '\(file.path)'; echo ok; sleep 0.5", timeout: .seconds(1))
+            Issue.record("The run should have timed out.")
+        } catch {
+            #expect(error.localizedDescription.contains("did not answer"))
+        }
+        let pid = try pid(in: file)
+        defer { kill(pid, SIGKILL) }
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(!isAlive(pid))
+    }
+
     @Test func killsAGrandchildThatIgnoresSIGTERMAfterTheCollectorExits() async throws {
         let file = temporaryFile()
         defer { try? FileManager.default.removeItem(at: file) }
