@@ -21,6 +21,42 @@ struct CollectorRunTests {
         FileManager.default.temporaryDirectory.appendingPathComponent("quota-pill-\(UUID().uuidString)")
     }
 
+    /// Starts an `Execution` that must fail and checks that nothing keeps it, or its pipes, alive afterwards.
+    private func expectReleaseAfterFailure(of process: Process, timeout: Duration, within limit: Duration) async throws {
+        weak var execution: Execution?
+        await #expect(throws: (any Error).self) {
+            try await withCheckedThrowingContinuation { continuation in
+                let started = Execution(process: process, continuation: continuation)
+                execution = started
+                started.start(timeout: timeout)
+            }
+        }
+        // Readers stop and pending grace work runs asynchronously, so give the release some time.
+        let deadline = ContinuousClock.now + limit
+        while execution != nil, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(execution == nil)
+    }
+
+    @Test func releasesTheExecutionWhenLaunchFails() async throws {
+        let file = temporaryFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        // Exists but is not executable, so launching it throws.
+        try "#!/bin/sh\necho ok\n".write(to: file, atomically: true, encoding: .utf8)
+        let process = Process()
+        process.executableURL = file
+        try await expectReleaseAfterFailure(of: process, timeout: .seconds(60), within: .seconds(1))
+    }
+
+    @Test func releasesTheExecutionAfterATimeout() async throws {
+        let process = Process()
+        process.executableURL = shell
+        process.arguments = ["-c", "exec sleep 600"]
+        // The kill ends the process and its handler, then the drain grace lets go.
+        try await expectReleaseAfterFailure(of: process, timeout: .seconds(1), within: .seconds(5))
+    }
+
     @Test func returnsStdout() async throws {
         #expect(try await run("echo ok") == "ok\n")
     }

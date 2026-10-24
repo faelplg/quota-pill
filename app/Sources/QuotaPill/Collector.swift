@@ -99,7 +99,7 @@ enum Collector {
 
 /// One collector process. Reads stdout and stderr as they arrive, so neither pipe can fill up
 /// and block the child, and resumes the continuation exactly once: on exit or on timeout.
-private final class Execution: Sendable {
+final class Execution: Sendable {
     private struct State {
         var continuation: CheckedContinuation<Data, any Error>?
         var output = Data()
@@ -143,6 +143,8 @@ private final class Execution: Sendable {
         do {
             try process.run()
         } catch {
+            // The handler only runs after an exit, so drop it here or it keeps this object and its pipes alive.
+            process.terminationHandler = nil
             finish(throwing: error)
             return
         }
