@@ -6,5 +6,6 @@ let package = Package(
     platforms: [.macOS(.v15)],
     targets: [
         .executableTarget(name: "QuotaPill", path: "Sources/QuotaPill"),
+        .testTarget(name: "QuotaPillTests", dependencies: ["QuotaPill"], path: "Tests/QuotaPillTests"),
     ]
 )

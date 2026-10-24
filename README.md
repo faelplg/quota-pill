@@ -102,6 +102,7 @@ bun start           # JSON report without alerts (accepts --only <harness> and -
 bun run pill        # builds and runs the pill once in the foreground
 bun test
 bun run typecheck
+swift test --package-path app   # pill tests; needs Xcode (Command Line Tools alone do not find Swift Testing)
 ```
 
 `src/adapters/` contains one file per harness, and all adapters return the same shape (`HarnessReport` in `src/types.ts`). `src/cli.ts` combines everything into JSON and triggers alerts, while `src/alerts.ts` stores notification state in the cache folder.
