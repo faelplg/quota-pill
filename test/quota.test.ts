@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { snapshotPath } from "../plugins/quota-pill/hooks/snapshot.ts";
 import { Database } from "bun:sqlite";
-import { mkdir } from "node:fs/promises";
 import { parseAntigravity } from "../src/adapters/antigravity.ts";
 import { parseClaude } from "../src/adapters/claude.ts";
 import { findLatestSnapshot, parseCodex } from "../src/adapters/codex.ts";
@@ -143,6 +142,101 @@ describe("copilot", () => {
     ],
   };
 
+  for (const [model, tokenBasedBilling, endpoint] of [
+    ["AI credits", true, "ai_credit/usage"],
+    ["legacy requests", false, "usage/summary"],
+  ] as const) {
+    test(`requests the current UTC billing month for ${model}`, async () => {
+      const directory = await mkdtemp(join(tmpdir(), "quota-pill-copilot-"));
+      const calls = join(directory, "gh-calls");
+      const quota = {
+        ...user({ ...overage, token_based_billing: tokenBasedBilling }),
+        login: "example-user",
+        quota_reset_date_utc: "2027-02-01T00:00:00Z",
+      };
+      const billing = { usageItems: [{
+        product: "Copilot",
+        unitType: tokenBasedBilling ? "ai-credits" : "requests",
+        pricePerUnit: tokenBasedBilling ? 0.01 : 0.04,
+        netAmount: 2.25,
+      }] };
+      try {
+        await writeFile(join(directory, "gh"), String.raw`#!/bin/sh
+printf '%s\n' "$@" >> "$QUOTA_PILL_GH_CALLS"
+if [ "$2" = /copilot_internal/user ]; then
+  printf '%s\n' '${JSON.stringify(quota)}'
+else
+  printf '%s\n' '${JSON.stringify(billing)}'
+fi
+`, { mode: 0o755 });
+        const child = Bun.spawn([process.execPath, "--eval", `
+          import { copilot } from "./src/adapters/copilot.ts";
+          console.log(JSON.stringify(await copilot.collect(new Date("2027-01-01T00:15:00Z"), {})));
+        `], {
+          cwd: join(import.meta.dir, ".."),
+          env: { PATH: directory, QUOTA_PILL_GH_CALLS: calls, TZ: "America/Los_Angeles" },
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        const [stdout, stderr, code] = await Promise.all([child.stdout.text(), child.stderr.text(), child.exited]);
+        expect({ code, stderr }).toEqual({ code: 0, stderr: "" });
+        expect((await Bun.file(calls).text()).trimEnd().split("\n")).toEqual([
+          "api", "/copilot_internal/user",
+          "api", `/users/example-user/settings/billing/${endpoint}?year=2027&month=1`,
+        ]);
+        const report = JSON.parse(stdout) as Pick<HarnessReport, "windows">;
+        expect(report.windows.find((window) => window.id === "extra")?.detail)
+          .toBe(tokenBasedBilling ? "$2.25/$5.00" : "$2.25/$20.00");
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    });
+  }
+
+  test("labels the current credit allowance and recognizes the Pro+ subscription SKU", () => {
+    const current = {
+      ...user({ token_based_billing: true, percent_remaining: 72.4, entitlement: 5000, remaining: 3620 }),
+      copilot_plan: "individual_pro",
+      access_type_sku: "plus_monthly_subscriber_quota",
+    };
+    const { plan, windows } = parseCopilot(current);
+    expect(plan).toBe("Pro+");
+    expect(windows).toEqual([{
+      id: "premium_interactions",
+      label: "AI credits (month)",
+      usedPct: 100 - 72.4,
+      resetsAt: new Date("2026-11-01T00:00:00.000Z"),
+      detail: "1380/5000",
+    }]);
+  });
+
+  test("calculates AI credit budget progress from paid usage in the billing report", () => {
+    const current = { ...user(overage), token_based_billing: true };
+    const { windows } = parseCopilot(current, {
+      usageItems: [
+        { product: "Copilot", unitType: "ai-credits", netAmount: 2 },
+        { product: "Copilot AI Credits", unitType: "credits", netAmount: 0.25 },
+        { product: "Copilot", unitType: "requests", netAmount: 8 },
+        { product: "GitHub Secret Protection", unitType: "ai-credits", netAmount: 10 },
+      ],
+    });
+    expect(windows.find((w) => w.id === "premium_interactions"))
+      .toMatchObject({ usedPct: 100, detail: "7000/7000" });
+    expect(windows.find((w) => w.id === "extra")).toMatchObject({ usedPct: 45, detail: "$2.25/$5.00" });
+  });
+
+  test("uses reported credits when paid usage has not reached the billing report", () => {
+    const current = { ...user(overage), token_based_billing: true };
+    const pending = { usageItems: [{ product: "Copilot", unitType: "ai-credits", netAmount: 0 }] };
+    for (const report of [undefined, pending]) {
+      expect(parseCopilot(current, report).windows.find((w) => w.id === "extra"))
+        .toMatchObject({ usedPct: 67, detail: "335/500 AI credits" });
+    }
+    const noOverage = { ...user({ ...overage, overage_count: 0 }), token_based_billing: true };
+    expect(parseCopilot(noOverage, pending).windows.find((w) => w.id === "extra"))
+      .toMatchObject({ usedPct: 0, detail: "$0.00/$5.00" });
+  });
+
   test("shows the extra budget in dollars from the billing summary", () => {
     const { windows } = parseCopilot(user(overage), summary);
     expect(windows.find((w) => w.id === "extra")).toEqual({
@@ -161,7 +255,7 @@ describe("copilot", () => {
 
   test("omits the extra window when overage is not permitted", () => {
     const { windows } = parseCopilot(user({ ...overage, overage_permitted: false }), summary);
-    expect(windows.map((w) => w.id)).toEqual(["premium_interactions"]);
+    expect(windows.map((w) => [w.id, w.label])).toEqual([["premium_interactions", "Premium (month)"]]);
   });
 
   test("suggests a scope refresh only when the user scope is missing", () => {
