@@ -8,7 +8,7 @@ CP 47  CX 6  CC 69  AG 0  CU 12
 
 Each number is the fullest window for that harness, in %. `–` means the source is currently unavailable, and `!` means an error occurred. Numbers are blue, turn orange at 80%, and red at 95%. When a threshold is crossed, macOS shows one notification per threshold in each reset cycle.
 
-The pill stays visible over full-screen apps. Hover over it to expand the details for each window, and click a section to open that service's usage page (or the Antigravity app). You can drag it, and its position is saved. The ↻ in the footer refreshes all sources, while the ↻ shown when hovering over a section refreshes only that harness. For Codex and Claude Code, this rereads local usage data. New measurements appear after the respective tool records them. Right-click offers "Refresh now" and "Quit".
+The pill stays visible over full-screen apps. Hover over it to see usage details. Click a section to open that service's usage page, or click the Antigravity heading to open its app. You can drag the pill, and its position is saved. The ↻ in the footer refreshes all sources, while the ↻ shown when hovering over a section refreshes only that harness. For Codex and Claude Code, this rereads local usage data. New measurements appear after the respective tool records them. Right-click offers "Refresh now" and "Quit".
 
 You only need the harnesses you actually use. The others show `–`.
 
@@ -82,6 +82,8 @@ Claude Code mods and GitHub's billing reports are documented interfaces. The oth
 | Cursor | `POST https://cursor.com/api/dashboard/get-current-period-usage` and `GET https://cursor.com/api/usage-summary` with the IDE session cookie | Sign in to the Cursor IDE (reads `state.vscdb`), or fall back to `cursor-agent` / `agent` login credentials. Shows included usage for the current period (weekly on plans like Premium) and extra/on-demand budget remaining. |
 
 Copilot shows an "Extra" window when the quota response includes an extra budget. The window uses dollars when GitHub's billing report provides the account's paid usage for the current month. Otherwise it uses the credits or requests reported by the quota source. The user-level billing reports cover usage billed to your personal account. See [GitHub's AI usage page](https://github.com/settings/billing/ai_usage) for the billing breakdown on individual usage-based plans.
+
+Antigravity shows the three models closest to their quota limits. Expand **more models** to see the rest. Identical readings from variants of the same model appear once. Open [AI credit activity](https://one.google.com/ai/activity) to check your Google One balance and credit history by product. To check whether Antigravity can use AI credits for overages, open **Settings → Models** in Antigravity.
 
 ## Privacy
 

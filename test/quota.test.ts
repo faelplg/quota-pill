@@ -101,21 +101,43 @@ describe("antigravity", () => {
     ]);
   });
 
-  test("collapses models that share one quota into a single window", () => {
+  test("shows identical readings once for variants of the same model", () => {
     const quotaInfo = { remainingFraction: 0.5, resetTime: "2026-10-10T07:00:00Z" };
     const { windows } = parseAntigravity({
       userStatus: {
         cascadeModelConfigData: {
           clientModelConfigs: [
             { label: "Gemini 3.8 Flash (Low)", quotaInfo },
-            { label: "Gemini 3.8 Flash (High)", quotaInfo },
+            { label: "Gemini 3.8 Flash (XHigh)", quotaInfo },
             { label: "Claude Opus 5.5 (Low)", quotaInfo },
           ],
         },
       },
     });
-    expect(windows).toHaveLength(1);
-    expect(windows[0]).toMatchObject({ label: "All models", usedPct: 50, detail: "2 models" });
+    expect(windows.map((window) => [window.label, window.usedPct])).toEqual([
+      ["Claude Opus 5.5", 50],
+      ["Gemini 3.8 Flash", 50],
+    ]);
+  });
+
+  test("preserves independent resets and skips disabled models", () => {
+    const { windows } = parseAntigravity({
+      userStatus: {
+        cascadeModelConfigData: {
+          clientModelConfigs: [
+            { label: "Gemini 4 Carbon", disabled: true, quotaInfo: {} },
+            { label: "Gemini 4 Hydrogen (Low)", quotaInfo: { remainingFraction: 0.25, resetTime: "2026-10-10T07:00:00Z" } },
+            { label: "Gemini 4 Hydrogen (XHigh)", quotaInfo: { remainingFraction: 0.25, resetTime: "2026-10-17T07:00:00Z" } },
+            { label: "Gemini 4 Argon", quotaInfo: { remainingFraction: 0.75 } },
+          ],
+        },
+      },
+    });
+    expect(windows.map(({ label, usedPct, resetsAt }) => [label, usedPct, resetsAt?.toISOString()])).toEqual([
+      ["Gemini 4 Hydrogen (Low)", 75, "2026-10-10T07:00:00.000Z"],
+      ["Gemini 4 Hydrogen (XHigh)", 75, "2026-10-17T07:00:00.000Z"],
+      ["Gemini 4 Argon", 25, undefined],
+    ]);
   });
 });
 
