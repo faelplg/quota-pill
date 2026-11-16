@@ -143,6 +143,50 @@ describe("copilot", () => {
     ],
   };
 
+  test("labels the current credit allowance and recognizes the Pro+ subscription SKU", () => {
+    const current = {
+      ...user({ token_based_billing: true, percent_remaining: 72.4, entitlement: 5000, remaining: 3620 }),
+      copilot_plan: "individual_pro",
+      access_type_sku: "plus_monthly_subscriber_quota",
+    };
+    const { plan, windows } = parseCopilot(current);
+    expect(plan).toBe("Pro+");
+    expect(windows).toEqual([{
+      id: "premium_interactions",
+      label: "AI credits (month)",
+      usedPct: 100 - 72.4,
+      resetsAt: new Date("2026-11-01T00:00:00.000Z"),
+      detail: "1380/5000",
+    }]);
+  });
+
+  test("calculates AI credit budget progress from paid usage in the billing report", () => {
+    const current = { ...user(overage), token_based_billing: true };
+    const { windows } = parseCopilot(current, {
+      usageItems: [
+        { product: "Copilot", unitType: "ai-credits", netAmount: 2 },
+        { product: "Copilot AI Credits", unitType: "credits", netAmount: 0.25 },
+        { product: "Copilot", unitType: "requests", netAmount: 8 },
+        { product: "GitHub Secret Protection", unitType: "ai-credits", netAmount: 10 },
+      ],
+    });
+    expect(windows.find((w) => w.id === "premium_interactions"))
+      .toMatchObject({ usedPct: 100, detail: "7000/7000" });
+    expect(windows.find((w) => w.id === "extra")).toMatchObject({ usedPct: 45, detail: "$2.25/$5.00" });
+  });
+
+  test("uses reported credits when paid usage has not reached the billing report", () => {
+    const current = { ...user(overage), token_based_billing: true };
+    const pending = { usageItems: [{ product: "Copilot", unitType: "ai-credits", netAmount: 0 }] };
+    for (const report of [undefined, pending]) {
+      expect(parseCopilot(current, report).windows.find((w) => w.id === "extra"))
+        .toMatchObject({ usedPct: 67, detail: "335/500 AI credits" });
+    }
+    const noOverage = { ...user({ ...overage, overage_count: 0 }), token_based_billing: true };
+    expect(parseCopilot(noOverage, pending).windows.find((w) => w.id === "extra"))
+      .toMatchObject({ usedPct: 0, detail: "$0.00/$5.00" });
+  });
+
   test("shows the extra budget in dollars from the billing summary", () => {
     const { windows } = parseCopilot(user(overage), summary);
     expect(windows.find((w) => w.id === "extra")).toEqual({
@@ -161,7 +205,7 @@ describe("copilot", () => {
 
   test("omits the extra window when overage is not permitted", () => {
     const { windows } = parseCopilot(user({ ...overage, overage_permitted: false }), summary);
-    expect(windows.map((w) => w.id)).toEqual(["premium_interactions"]);
+    expect(windows.map((w) => [w.id, w.label])).toEqual([["premium_interactions", "Premium (month)"]]);
   });
 
   test("suggests a scope refresh only when the user scope is missing", () => {

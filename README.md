@@ -71,15 +71,17 @@ The plugin is a [mod](https://code.claude.com/docs/en/plugins/mods/overview) wit
 
 ## Sources
 
-Only the Claude Code source is a documented interface. The others are not public APIs and may change without notice. Each adapter fails independently and shows what happened in the pill.
+Claude Code mods and GitHub's billing reports are documented interfaces. The other usage sources rely on local formats or private APIs that may change. Each adapter fails independently and shows what happened in the pill.
 
 | Harness | Source | Setup |
 | --- | --- | --- |
-| Copilot | `gh api /copilot_internal/user`, plus the [billing usage summary](https://docs.github.com/rest/billing/usage) for extra spend | Install the [GitHub CLI](https://cli.github.com) and run `gh auth login`. When you allow spending past your plan, an "Extra" window shows how much of that budget you used. To see it in dollars, run `gh auth refresh -h github.com -s user`; without it, the window shows units. |
+| Copilot | `gh api /copilot_internal/user` for plan limits, plus [GitHub billing reports](https://docs.github.com/en/rest/billing/usage) for extra spend | Install the [GitHub CLI](https://cli.github.com) and run `gh auth login`. The pill shows AI Credits on usage-based plans and premium requests on legacy plans. If `gh` requests the `user` scope for billing, run `gh auth refresh -h github.com -s user`. |
 | Codex | Latest `rate_limits` event in `~/.codex/sessions` (or `$CODEX_HOME`) | None. Updates only when you use Codex. Windows whose reset has passed are shown as zero. |
 | Claude Code | Plan windows recorded by the [Claude Code plugin](#claude-code-plugin) | Install the plugin. Updates only when you use Claude Code, on a Pro or Max plan. Windows whose reset has passed are shown as zero. |
 | Antigravity | `GetUserStatus` in the app's local language server | None. Works only while Antigravity is open. |
 | Cursor | `POST https://cursor.com/api/dashboard/get-current-period-usage` and `GET https://cursor.com/api/usage-summary` with the IDE session cookie | Sign in to the Cursor IDE (reads `state.vscdb`), or fall back to `cursor-agent` / `agent` login credentials. Shows included usage for the current period (weekly on plans like Premium) and extra/on-demand budget remaining. |
+
+Copilot shows an "Extra" window when the quota response includes an extra budget. The window uses dollars when GitHub's billing report provides the account's paid usage for the current month. Otherwise it uses the credits or requests reported by the quota source. The user-level billing reports cover usage billed to your personal account. See [GitHub's AI usage page](https://github.com/settings/billing/ai_usage) for the billing breakdown on individual usage-based plans.
 
 ## Privacy
 
