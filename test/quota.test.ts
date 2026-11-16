@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { snapshotPath } from "../plugins/quota-pill/hooks/snapshot.ts";
 import { Database } from "bun:sqlite";
-import { mkdir } from "node:fs/promises";
 import { parseAntigravity } from "../src/adapters/antigravity.ts";
 import { parseClaude } from "../src/adapters/claude.ts";
 import { findLatestSnapshot, parseCodex } from "../src/adapters/codex.ts";
@@ -142,6 +141,57 @@ describe("copilot", () => {
       { product: "Copilot", sku: "copilot_ai_unit", netAmount: 3.355698134, pricePerUnit: 0.01 },
     ],
   };
+
+  for (const [model, tokenBasedBilling, endpoint] of [
+    ["AI credits", true, "ai_credit/usage"],
+    ["legacy requests", false, "usage/summary"],
+  ] as const) {
+    test(`requests the current UTC billing month for ${model}`, async () => {
+      const directory = await mkdtemp(join(tmpdir(), "quota-pill-copilot-"));
+      const calls = join(directory, "gh-calls");
+      const quota = {
+        ...user({ ...overage, token_based_billing: tokenBasedBilling }),
+        login: "example-user",
+        quota_reset_date_utc: "2027-02-01T00:00:00Z",
+      };
+      const billing = { usageItems: [{
+        product: "Copilot",
+        unitType: tokenBasedBilling ? "ai-credits" : "requests",
+        pricePerUnit: tokenBasedBilling ? 0.01 : 0.04,
+        netAmount: 2.25,
+      }] };
+      try {
+        await writeFile(join(directory, "gh"), String.raw`#!/bin/sh
+printf '%s\n' "$@" >> "$QUOTA_PILL_GH_CALLS"
+if [ "$2" = /copilot_internal/user ]; then
+  printf '%s\n' '${JSON.stringify(quota)}'
+else
+  printf '%s\n' '${JSON.stringify(billing)}'
+fi
+`, { mode: 0o755 });
+        const child = Bun.spawn([process.execPath, "--eval", `
+          import { copilot } from "./src/adapters/copilot.ts";
+          console.log(JSON.stringify(await copilot.collect(new Date("2027-01-01T00:15:00Z"), {})));
+        `], {
+          cwd: join(import.meta.dir, ".."),
+          env: { PATH: directory, QUOTA_PILL_GH_CALLS: calls, TZ: "America/Los_Angeles" },
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        const [stdout, stderr, code] = await Promise.all([child.stdout.text(), child.stderr.text(), child.exited]);
+        expect({ code, stderr }).toEqual({ code: 0, stderr: "" });
+        expect((await Bun.file(calls).text()).trimEnd().split("\n")).toEqual([
+          "api", "/copilot_internal/user",
+          "api", `/users/example-user/settings/billing/${endpoint}?year=2027&month=1`,
+        ]);
+        const report = JSON.parse(stdout) as Pick<HarnessReport, "windows">;
+        expect(report.windows.find((window) => window.id === "extra")?.detail)
+          .toBe(tokenBasedBilling ? "$2.25/$5.00" : "$2.25/$20.00");
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    });
+  }
 
   test("labels the current credit allowance and recognizes the Pro+ subscription SKU", () => {
     const current = {
