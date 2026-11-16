@@ -25,7 +25,7 @@ export interface HarnessReport {
 }
 
 export interface CollectOptions {
-  /** Skip local caches; set when the user explicitly asks for fresh data. */
+  /** Set for manual refreshes. Current adapters always read their source directly. */
   force?: boolean;
 }
 

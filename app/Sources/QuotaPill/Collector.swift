@@ -51,7 +51,7 @@ enum Collector {
 
     /// - Parameters:
     ///   - only: Restricts the run to one harness.
-    ///   - force: Skips local caches, for refreshes the user asked for.
+    ///   - force: Marks a manual refresh. Current adapters read the same sources either way.
     static func collect(only harness: String? = nil, force: Bool = false) async throws -> [HarnessReport] {
         guard let bun = searchPath
             .map({ URL(fileURLWithPath: $0).appendingPathComponent("bun") })

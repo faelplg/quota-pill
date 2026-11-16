@@ -11,7 +11,7 @@ const USAGE = `Usage: bun src/cli.ts [--only <harness>] [--force] [--no-alerts]
   80% or 95%.
 
   --only <harness>  Queries only this harness (${HARNESSES.join(", ")}); can be repeated
-  --force           Skips local caches and queries the source now
+  --force           Accepted for compatibility. Currently has no effect.
   --no-alerts       Sends no notifications and does not change alert state`;
 
 async function main(argv: string[]): Promise<number> {
