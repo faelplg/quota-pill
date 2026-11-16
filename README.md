@@ -8,7 +8,7 @@ CP 47  CX 6  CC 69  AG 0  CU 12
 
 Each number is the fullest window for that harness, in %. `–` means the source is currently unavailable, and `!` means an error occurred. Numbers are blue, turn orange at 80%, and red at 95%. When a threshold is crossed, macOS shows one notification per threshold in each reset cycle.
 
-The pill stays visible over full-screen apps. Hover over it to expand the details for each window, and click a section to open that service's usage page (or the Antigravity app). You can drag it, and its position is saved. The ↻ in the footer refreshes everything, while the ↻ shown when hovering over a section refreshes only that harness and bypasses the cache. Right-click offers "Refresh now" and "Quit".
+The pill stays visible over full-screen apps. Hover over it to expand the details for each window, and click a section to open that service's usage page (or the Antigravity app). You can drag it, and its position is saved. The ↻ in the footer refreshes all sources, while the ↻ shown when hovering over a section refreshes only that harness. For Codex and Claude Code, this rereads local usage data. New measurements appear after the respective tool records them. Right-click offers "Refresh now" and "Quit".
 
 You only need the harnesses you actually use. The others show `–`.
 
@@ -83,9 +83,10 @@ Only the Claude Code source is a documented interface. The others are not public
 
 ## Privacy
 
-Quota Pill has no server and no telemetry, and it never reads or stores credentials itself.
+Quota Pill has no server or telemetry. Its sources use the following local data and connections.
 
-- The only network requests go to GitHub, through `gh` and its own login; to Cursor's usage-summary and current-period usage endpoints, using the session already stored by the Cursor IDE or `cursor-agent` CLI; and to Antigravity's language server on `127.0.0.1`. Codex and Claude Code are read from local files.
+- GitHub requests go through `gh`, which handles its own login. Antigravity requests go to its language server on `127.0.0.1`. Codex and Claude Code usage is read from local files.
+- The Cursor adapter reads the existing access token from the IDE's local state database or, as a fallback, from the CLI's saved login in the macOS Keychain or a local auth file. It copies the database and any available journal files to a temporary directory to avoid SQLite locks while Cursor is open. It removes that directory when the read finishes. The adapter sends a session cookie derived from the token only to Cursor's two usage endpoints on `cursor.com`.
 - Alert state and other caches are kept in `~/Library/Caches/quota-pill/` (or `$XDG_CACHE_HOME/quota-pill/`). The Claude Code snapshot always stays in `~/Library/Caches/quota-pill/`, because Claude Code and the pill's LaunchAgent do not share environment variables.
 
 ## Troubleshooting
@@ -98,7 +99,7 @@ Quota Pill has no server and no telemetry, and it never reads or stores credenti
 ## Development
 
 ```sh
-bun start           # JSON report without alerts (accepts --only <harness> and --force)
+bun start           # JSON report without alerts (accepts --only <harness>)
 bun run pill        # builds and runs the pill once in the foreground
 bun test
 bun run typecheck
