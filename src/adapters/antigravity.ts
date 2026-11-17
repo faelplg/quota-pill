@@ -3,13 +3,9 @@ import { clampPct, UnavailableError, type Adapter, type QuotaWindow } from "../t
 
 interface ModelConfig {
   label?: string;
+  modelId?: string;
   disabled?: boolean;
   quotaInfo?: { remainingFraction?: number; resetTime?: string };
-}
-
-interface ModelQuota {
-  remaining: number;
-  resetTime?: string;
 }
 
 interface UserStatusResponse {
@@ -28,37 +24,24 @@ const OPEN_APP = "Open Antigravity to read the quota.";
 
 export function parseAntigravity(body: UserStatusResponse) {
   const configs = body.userStatus?.cascadeModelConfigData?.clientModelConfigs ?? [];
-  const byModel = new Map<string, Map<string, ModelQuota>>();
+  const byVariant = new Map<string, QuotaWindow>();
   for (const config of configs) {
-    if (!config.label || !config.quotaInfo || config.disabled) continue;
-    const label = config.label;
-    const model = label.replace(/\s*\((low|medium|high|xhigh)\)\s*$/i, "");
-    const variants = byModel.get(model) ?? new Map<string, ModelQuota>();
+    const { label, modelId, quotaInfo } = config;
+    if (!label || !quotaInfo || config.disabled) continue;
+    const id = modelId || label;
     // Protobuf JSON omits zero values, so a missing fraction means nothing is left.
-    const remaining = config.quotaInfo.remainingFraction ?? 0;
-    const current = variants.get(label);
-    if (!current || remaining < current.remaining) {
-      variants.set(label, { remaining, resetTime: config.quotaInfo.resetTime });
-    }
-    byModel.set(model, variants);
-  }
-
-  const windows: QuotaWindow[] = [];
-  for (const [model, variants] of byModel) {
-    const [first, ...others] = variants.values();
-    if (!first) continue;
-    // Show identical readings once within a named model. Distinct models can have independent limits.
-    const identical = others.every((q) => q.remaining === first.remaining && q.resetTime === first.resetTime);
-    for (const [label, q] of identical ? [[model, first]] as const : variants) {
-      windows.push({
-        id: label,
+    const usedPct = clampPct((1 - (quotaInfo.remainingFraction ?? 0)) * 100);
+    const current = byVariant.get(id);
+    if (!current || usedPct > current.usedPct) {
+      byVariant.set(id, {
+        id,
         label,
-        usedPct: clampPct((1 - q.remaining) * 100),
-        resetsAt: q.resetTime ? new Date(q.resetTime) : undefined,
+        usedPct,
+        resetsAt: quotaInfo.resetTime ? new Date(quotaInfo.resetTime) : undefined,
       });
     }
   }
-  windows.sort((a, b) => b.usedPct - a.usedPct || a.label.localeCompare(b.label));
+  const windows = [...byVariant.values()].sort((a, b) => b.usedPct - a.usedPct || a.label.localeCompare(b.label));
 
   return {
     status: "ok" as const,

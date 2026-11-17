@@ -96,27 +96,28 @@ describe("antigravity", () => {
       },
     });
     expect(windows.map((w) => [w.label, w.usedPct])).toEqual([
-      ["Claude Opus 5.5", 100],
-      ["Gemini 3.1 Pro", 25],
+      ["Claude Opus 5.5 (High)", 100],
+      ["Gemini 3.1 Pro (Low)", 25],
     ]);
   });
 
-  test("shows identical readings once for variants of the same model", () => {
+  test("keeps variants with identical quota readings separate", () => {
     const quotaInfo = { remainingFraction: 0.5, resetTime: "2026-10-10T07:00:00Z" };
     const { windows } = parseAntigravity({
       userStatus: {
         cascadeModelConfigData: {
           clientModelConfigs: [
-            { label: "Gemini 3.8 Flash (Low)", quotaInfo },
-            { label: "Gemini 3.8 Flash (XHigh)", quotaInfo },
+            { label: "Gemini 3.8 Flash (Low)", modelId: "gemini-3.8-flash-low", quotaInfo },
+            { label: "Gemini 3.8 Flash (XHigh)", modelId: "gemini-3.8-flash-xhigh", quotaInfo },
             { label: "Claude Opus 5.5 (Low)", quotaInfo },
           ],
         },
       },
     });
-    expect(windows.map((window) => [window.label, window.usedPct])).toEqual([
-      ["Claude Opus 5.5", 50],
-      ["Gemini 3.8 Flash", 50],
+    expect(windows.map(({ id, label, usedPct }) => [id, label, usedPct])).toEqual([
+      ["Claude Opus 5.5 (Low)", "Claude Opus 5.5 (Low)", 50],
+      ["gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)", 50],
+      ["gemini-3.8-flash-xhigh", "Gemini 3.8 Flash (XHigh)", 50],
     ]);
   });
 

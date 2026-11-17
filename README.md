@@ -83,7 +83,7 @@ Claude Code mods and GitHub's billing reports are documented interfaces. The oth
 
 Copilot shows an "Extra" window when the quota response includes an extra budget. The window uses dollars when GitHub's billing report provides the account's paid usage for the current month. Otherwise it uses the credits or requests reported by the quota source. The user-level billing reports cover usage billed to your personal account. See [GitHub's AI usage page](https://github.com/settings/billing/ai_usage) for the billing breakdown on individual usage-based plans.
 
-Antigravity shows the three models closest to their quota limits. Expand **more models** to see the rest. Identical readings from variants of the same model appear once. Open [AI credit activity](https://one.google.com/ai/activity) to check your Google One balance and credit history by product. To check whether Antigravity can use AI credits for overages, open **Settings → Models** in Antigravity.
+Antigravity shows the three model variants closest to their quota limits. Expand **more models** to see the rest. Each variant keeps its own quota reading and reset time. Open [AI credit activity](https://one.google.com/ai/activity) to check your Google One balance and credit history by product. To check whether Antigravity can use AI credits for overages, open **Settings → Models** in Antigravity.
 
 ## Privacy
 
