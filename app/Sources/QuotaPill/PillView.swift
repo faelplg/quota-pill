@@ -10,6 +10,7 @@ private let links: [String: URL] = [
 
 private let cardRadius: CGFloat = 14
 private let detailsWidth: CGFloat = 300
+private let aiCreditActivity = URL(string: "https://one.google.com/ai/activity")!
 
 struct PillView: View {
     let store: QuotaStore
@@ -191,12 +192,28 @@ private struct SectionView: View {
 
     @State private var isHovered = false
 
+    private var isAntigravity: Bool { report.harness == "antigravity" }
+
     var body: some View {
+        if isAntigravity {
+            section
+        } else {
+            section
+                .contentShape(.rect)
+                .onTapGesture(perform: open)
+        }
+    }
+
+    private var section: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(report.name)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Palette.accent)
+                if isAntigravity {
+                    Button(action: open) { title }
+                        .buttonStyle(.plain)
+                        .help("Open Antigravity")
+                } else {
+                    title
+                }
                 if let plan = report.plan {
                     Text(plan)
                         .font(.system(size: 11))
@@ -212,8 +229,11 @@ private struct SectionView: View {
             if report.status == .ok {
                 if report.windows.isEmpty {
                     note("No active limits.")
+                } else if isAntigravity {
+                    AntigravityWindows(windows: report.windows)
+                } else {
+                    ForEach(report.windows) { WindowRow(window: $0) }
                 }
-                ForEach(report.windows) { WindowRow(window: $0) }
                 if let caveat {
                     note(caveat)
                 }
@@ -223,10 +243,20 @@ private struct SectionView: View {
                     .foregroundStyle(report.status == .error ? Palette.critical : .secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            if isAntigravity {
+                Link("AI credit activity", destination: aiCreditActivity)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.accent)
+            }
         }
-        .contentShape(.rect)
-        .onTapGesture(perform: open)
         .onHover { isHovered = $0 }
+    }
+
+    private var title: some View {
+        Text(report.name)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(Palette.accent)
     }
 
     private var caveat: String? {
@@ -247,6 +277,50 @@ private struct SectionView: View {
         } else if report.harness == "antigravity",
                   let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.antigravity") {
             NSWorkspace.shared.openApplication(at: app, configuration: .init())
+        }
+    }
+}
+
+private struct AntigravityWindows: View {
+    let windows: [QuotaWindow]
+    @State private var showsOtherModels = false
+
+    var body: some View {
+        let remaining = windows.dropFirst(3)
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(windows.prefix(3)) { WindowRow(window: $0) }
+            if !remaining.isEmpty {
+                Button {
+                    showsOtherModels.toggle()
+                } label: {
+                    Label(
+                        showsOtherModels ? "Hide other models" : "\(remaining.count) more models",
+                        systemImage: showsOtherModels ? "chevron.down" : "chevron.right"
+                    )
+                    .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11))
+                .foregroundStyle(Palette.accent)
+                .accessibilityValue(showsOtherModels ? "Expanded" : "Collapsed")
+
+                if showsOtherModels {
+                    if remaining.count > 3 {
+                        ScrollView {
+                            rows(remaining)
+                        }
+                        .frame(height: 144)
+                    } else {
+                        rows(remaining)
+                    }
+                }
+            }
+        }
+    }
+
+    private func rows(_ windows: ArraySlice<QuotaWindow>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(windows) { WindowRow(window: $0) }
         }
     }
 }

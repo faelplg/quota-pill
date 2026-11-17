@@ -3,6 +3,8 @@ import { clampPct, UnavailableError, type Adapter, type QuotaWindow } from "../t
 
 interface ModelConfig {
   label?: string;
+  modelId?: string;
+  disabled?: boolean;
   quotaInfo?: { remainingFraction?: number; resetTime?: string };
 }
 
@@ -22,37 +24,24 @@ const OPEN_APP = "Open Antigravity to read the quota.";
 
 export function parseAntigravity(body: UserStatusResponse) {
   const configs = body.userStatus?.cascadeModelConfigData?.clientModelConfigs ?? [];
-  const byModel = new Map<string, { remaining: number; resetTime?: string }>();
+  const byVariant = new Map<string, QuotaWindow>();
   for (const config of configs) {
-    if (!config.label || !config.quotaInfo) continue;
-    const model = config.label.replace(/\s*\((low|medium|high)\)\s*$/i, "");
+    const { label, modelId, quotaInfo } = config;
+    if (!label || !quotaInfo || config.disabled) continue;
+    const id = modelId || label;
     // Protobuf JSON omits zero values, so a missing fraction means nothing is left.
-    const remaining = config.quotaInfo.remainingFraction ?? 0;
-    const current = byModel.get(model);
-    if (!current || remaining < current.remaining) {
-      byModel.set(model, { remaining, resetTime: config.quotaInfo.resetTime });
+    const usedPct = clampPct((1 - (quotaInfo.remainingFraction ?? 0)) * 100);
+    const current = byVariant.get(id);
+    if (!current || usedPct > current.usedPct) {
+      byVariant.set(id, {
+        id,
+        label,
+        usedPct,
+        resetsAt: quotaInfo.resetTime ? new Date(quotaInfo.resetTime) : undefined,
+      });
     }
   }
-
-  const entries = [...byModel.entries()];
-  const first = entries[0]?.[1];
-  const shared = first && entries.every(([, q]) => q.remaining === first.remaining && q.resetTime === first.resetTime);
-  const windows: QuotaWindow[] = shared && entries.length > 1
-    ? [{
-      id: "all",
-      label: "All models",
-      usedPct: clampPct((1 - first.remaining) * 100),
-      resetsAt: first.resetTime ? new Date(first.resetTime) : undefined,
-      detail: `${entries.length} models`,
-    }]
-    : entries
-      .map(([model, q]) => ({
-        id: model,
-        label: model,
-        usedPct: clampPct((1 - q.remaining) * 100),
-        resetsAt: q.resetTime ? new Date(q.resetTime) : undefined,
-      }))
-      .sort((a, b) => b.usedPct - a.usedPct || a.label.localeCompare(b.label));
+  const windows = [...byVariant.values()].sort((a, b) => b.usedPct - a.usedPct || a.label.localeCompare(b.label));
 
   return {
     status: "ok" as const,

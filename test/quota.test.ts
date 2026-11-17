@@ -96,26 +96,49 @@ describe("antigravity", () => {
       },
     });
     expect(windows.map((w) => [w.label, w.usedPct])).toEqual([
-      ["Claude Opus 5.5", 100],
-      ["Gemini 3.1 Pro", 25],
+      ["Claude Opus 5.5 (High)", 100],
+      ["Gemini 3.1 Pro (Low)", 25],
     ]);
   });
 
-  test("collapses models that share one quota into a single window", () => {
+  test("keeps variants with identical quota readings separate", () => {
     const quotaInfo = { remainingFraction: 0.5, resetTime: "2026-10-10T07:00:00Z" };
     const { windows } = parseAntigravity({
       userStatus: {
         cascadeModelConfigData: {
           clientModelConfigs: [
-            { label: "Gemini 3.8 Flash (Low)", quotaInfo },
-            { label: "Gemini 3.8 Flash (High)", quotaInfo },
+            { label: "Gemini 3.8 Flash (Low)", modelId: "gemini-3.8-flash-low", quotaInfo },
+            { label: "Gemini 3.8 Flash (XHigh)", modelId: "gemini-3.8-flash-xhigh", quotaInfo },
             { label: "Claude Opus 5.5 (Low)", quotaInfo },
           ],
         },
       },
     });
-    expect(windows).toHaveLength(1);
-    expect(windows[0]).toMatchObject({ label: "All models", usedPct: 50, detail: "2 models" });
+    expect(windows.map(({ id, label, usedPct }) => [id, label, usedPct])).toEqual([
+      ["Claude Opus 5.5 (Low)", "Claude Opus 5.5 (Low)", 50],
+      ["gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)", 50],
+      ["gemini-3.8-flash-xhigh", "Gemini 3.8 Flash (XHigh)", 50],
+    ]);
+  });
+
+  test("preserves independent resets and skips disabled models", () => {
+    const { windows } = parseAntigravity({
+      userStatus: {
+        cascadeModelConfigData: {
+          clientModelConfigs: [
+            { label: "Gemini 4 Carbon", disabled: true, quotaInfo: {} },
+            { label: "Gemini 4 Hydrogen (Low)", quotaInfo: { remainingFraction: 0.25, resetTime: "2026-10-10T07:00:00Z" } },
+            { label: "Gemini 4 Hydrogen (XHigh)", quotaInfo: { remainingFraction: 0.25, resetTime: "2026-10-17T07:00:00Z" } },
+            { label: "Gemini 4 Argon", quotaInfo: { remainingFraction: 0.75 } },
+          ],
+        },
+      },
+    });
+    expect(windows.map(({ label, usedPct, resetsAt }) => [label, usedPct, resetsAt?.toISOString()])).toEqual([
+      ["Gemini 4 Hydrogen (Low)", 75, "2026-10-10T07:00:00.000Z"],
+      ["Gemini 4 Hydrogen (XHigh)", 75, "2026-10-17T07:00:00.000Z"],
+      ["Gemini 4 Argon", 25, undefined],
+    ]);
   });
 });
 
