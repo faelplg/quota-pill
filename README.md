@@ -2,11 +2,9 @@
 
 A floating macOS pill that shows how much of your GitHub Copilot, Codex, Claude Code, Antigravity, and Cursor quotas you have used.
 
-```
-CP 47  CX 6  CC 69  AG 0  CU 12
-```
+<img src="docs/images/quota-pill-expanded.png" width="328" alt="Expanded Quota Pill on macOS with example usage, reset times, the Copilot extra budget, and the Antigravity AI credit activity link.">
 
-Each number is the fullest window for that harness, in %. `–` means the source is currently unavailable, and `!` means an error occurred. Numbers are blue, turn orange at 80%, and red at 95%. When a threshold is crossed, macOS shows one notification per threshold in each reset cycle.
+Each number in the top row is the fullest window for that harness, in %. `–` means the source is currently unavailable, and `!` means an error occurred. Numbers are blue, turn orange at 80%, and red at 95%. When a threshold is crossed, macOS shows one notification per threshold in each reset cycle.
 
 The pill stays visible over full-screen apps. Hover over it to see usage details. Click a section to open that service's usage page, or click the Antigravity heading to open its app. You can drag the pill, and its position is saved. The ↻ in the footer refreshes all sources, while the ↻ shown when hovering over a section refreshes only that harness. For Codex and Claude Code, this rereads local usage data. New measurements appear after the respective tool records them. Right-click offers "Refresh now" and "Quit".
 
