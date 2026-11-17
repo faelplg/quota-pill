@@ -13,7 +13,7 @@ The state map and the chosen commit are in `.radiant.json` at this root. Read
 the artifacts the task needs and the contract pointer given in the map. This
 product's rules and commands belong to the local context indicated there.
 When the map has an `engineering_profile`, read it together with the Baseline
-in the Radiant checkout before starting a Build.
+in the Radiant checkout and the stack pack it selects before starting a Build.
 
 Safe commands: `bun test`, `bun run typecheck`,
 `swift build -c release --package-path app`.
